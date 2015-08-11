@@ -44,6 +44,9 @@ MObject DeltaMush::globalScale;
 //if using maya matrix better way to set the value? maybe try to hack a memcpy in ?
 //worth considering data refactorying of pos n n n n pos n n n n to ensure cache friendliness? though this is just a guess
 //the data refactoring might very well be slower but having a flat buffer of neighbour might help rather then package the point with all the data
+//possible gpu?
+
+
 DeltaMush::DeltaMush()
 {
 	initialized = 0 ;
