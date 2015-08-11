@@ -7,8 +7,8 @@
 #include <vector>
 #include <maya/MGlobal.h>
 
-#ifndef _nDeltaMush
-#define _nDeltaMush
+#ifndef _DeltaMush
+#define _DeltaMush
 
 
 struct point_data
@@ -21,10 +21,10 @@ struct point_data
 
 using namespace std;
 
-class nDeltaMush : public MPxDeformerNode
+class DeltaMush : public MPxDeformerNode
 {
 public:
-	nDeltaMush();
+	DeltaMush();
 	static  void*		creator();
 	static  MStatus		initialize();
 	virtual MStatus		deform(MDataBlock& data, MItGeometry& iter, const MMatrix& mat, unsigned int mIndex);
@@ -62,6 +62,7 @@ public :
 
 private :
 	MPointArray targetPos;
+	MPointArray pos;
 	std::vector<point_data> dataPoints;
 	bool initialized;
 

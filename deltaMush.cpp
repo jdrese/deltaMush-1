@@ -17,31 +17,31 @@
 
 #define SMALL (float)1e-6
 
-MTypeId     nDeltaMush::id( 0x0011FF83); 
+MTypeId     DeltaMush::id( 0x0011FF83); 
 
-MObject nDeltaMush::rebind ;
-MObject nDeltaMush::referenceMesh;
-MObject nDeltaMush::iterations;
-MObject nDeltaMush::useMulti;
-MObject nDeltaMush::applyDelta;
-MObject nDeltaMush::amount;
-MObject nDeltaMush::mapMult;
-MObject nDeltaMush::globalScale;
+MObject DeltaMush::rebind ;
+MObject DeltaMush::referenceMesh;
+MObject DeltaMush::iterations;
+MObject DeltaMush::useMulti;
+MObject DeltaMush::applyDelta;
+MObject DeltaMush::amount;
+MObject DeltaMush::mapMult;
+MObject DeltaMush::globalScale;
 
-//MObjectArray nDeltaMush::aWeightMapArray;
-//MObjectArray nDeltaMush::aWeightParentArray;
+//MObjectArray DeltaMush::aWeightMapArray;
+//MObjectArray DeltaMush::aWeightParentArray;
 
-nDeltaMush::nDeltaMush()
+DeltaMush::DeltaMush()
 {
 	initialized = 0 ;
 	targetPos.setLength(0);
 }
 
 //creator funtion
-void* nDeltaMush::creator(){ return new nDeltaMush(); }
+void* DeltaMush::creator(){ return new DeltaMush(); }
 
 
-MStatus nDeltaMush::initialize()
+MStatus DeltaMush::initialize()
 {
 	MFnNumericAttribute numericAttr;
 	MFnTypedAttribute tAttr;
@@ -105,11 +105,11 @@ MStatus nDeltaMush::initialize()
 	attributeAffects ( amount, outputGeom);
 	attributeAffects ( globalScale, outputGeom);
 
-	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer nDeltaMush weights");
+	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer DeltaMush weights");
 	return MStatus::kSuccess;
 }
 
-MStatus nDeltaMush::deform( MDataBlock& data, MItGeometry& iter, 
+MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter, 
 						const MMatrix& localToWorldMatrix, 
 						unsigned int mIndex )
 {	
@@ -125,7 +125,6 @@ MStatus nDeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 	}
 
 	// Getting needed data
-  	MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
 	double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
 	double applyDeltaV = data.inputValue(applyDelta).asDouble();
@@ -133,15 +132,16 @@ MStatus nDeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 	bool rebindV = data.inputValue(rebind).asBool();
 	double globalScaleV = data.inputValue( globalScale).asDouble();
 
-
-	MPointArray pos;
-	iter.allPositions(pos, MSpace::kWorld);
-
 	if (initialized == 0 || rebindV == true)
 	{
-		rebindData(referenceMeshV, iterationsV,amountV);
+  	    MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
+	    pos.setLength(iter.exactCount());	
+        rebindData(referenceMeshV, iterationsV,amountV);
 		initialized = 1;
 	}
+
+	iter.allPositions(pos, MSpace::kWorld);
+
 
 	if (envelopeV < SMALL ) 
 	{
@@ -161,13 +161,10 @@ MStatus nDeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 		return MS::kSuccess;
 	else
 		final.copy(targetPos);
-
 	
 	
 	for (i = 0 ; i <size;i++)
 	{
-		
-		
 		delta = MVector(0,0,0);
 		if (applyDeltaV >= SMALL )
 		{
@@ -225,7 +222,7 @@ MStatus nDeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 }
 
 
-void nDeltaMush::initData(
+void DeltaMush::initData(
     			 MObject &mesh,
     			 int iters)
 {
@@ -259,7 +256,7 @@ void nDeltaMush::initData(
 
 }
 
-void nDeltaMush::averageRelax( MPointArray& source ,
+void DeltaMush::averageRelax( MPointArray& source ,
 					   MPointArray& target , int iter,
 					   double amountV)
 {
@@ -294,7 +291,7 @@ void nDeltaMush::averageRelax( MPointArray& source ,
 
 }
 
-void nDeltaMush::computeDelta(MPointArray& source ,
+void DeltaMush::computeDelta(MPointArray& source ,
 					   MPointArray& target)
 {
 	int size = source.length();
@@ -345,7 +342,7 @@ void nDeltaMush::computeDelta(MPointArray& source ,
 }
 
 
-void nDeltaMush::rebindData(		MObject &mesh,
+void DeltaMush::rebindData(		MObject &mesh,
 									int iter,
 									double amount
 								)
@@ -362,7 +359,7 @@ void nDeltaMush::rebindData(		MObject &mesh,
 
 }
 
-MStatus nDeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray )
+MStatus DeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray )
 {
     MStatus status;
 	if ( plug == iterations || plug == amount)
