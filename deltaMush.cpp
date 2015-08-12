@@ -29,12 +29,12 @@ MObject DeltaMush::mapMult;
 MObject DeltaMush::globalScale;
 
 //TODO
-//better average calculation using pointer and not deep copy
-//avoid usage of final array and try to use final buffer
-//check if possible to avoid normalization and do a simple average
+//better average calculation using pointer and not deep copy X
+//avoid usage of final array and try to use final buffer X
+//check if possible to avoid normalization and do a simple average =
+//move the ifs statement that leads to return in one X 
+//reverse  if statement to make most likely choice as first to help instruction cache X
 //move variable declaration in header and move all attribute pull in pre-load / set dep dirty?
-//move the ifs statement that leads to return in one 
-//reverse  if statement to make most likely choice as first to help instruction cache
 //make average parallel
 //make delta computation parallel
 //make both average and delta in one parallel call with a lock? faster or not?
@@ -122,7 +122,7 @@ MStatus DeltaMush::initialize()
 	attributeAffects ( amount, outputGeom);
 	attributeAffects ( globalScale, outputGeom);
 
-	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer DeltaMush weights");
+	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer mg_deltaMush weights");
 	return MStatus::kSuccess;
 }
 
@@ -133,103 +133,94 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 	
 	//Preliminary check :
 	//Check if the ref mesh is connected
-	MPlug refMeshPlug( thisMObject(), referenceMesh );
-	    
-	if (refMeshPlug.isConnected() == false)
-	{	
-        std::cout<<"ref mesh not connected"<<std::endl;
-        return MS::kNotImplemented;
-	}
-
-	// Getting needed data
 	double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
-	double applyDeltaV = data.inputValue(applyDelta).asDouble();
-	double amountV = data.inputValue(amount).asDouble();
-	bool rebindV = data.inputValue(rebind).asBool();
-	double globalScaleV = data.inputValue( globalScale).asDouble();
-
-	if (initialized == false|| rebindV == true)
-	{
-  	    MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
-	    pos.setLength(iter.exactCount());	
-        targetPos.setLength(iter.exactCount());
-        rebindData(referenceMeshV, iterationsV,amountV);
-		initialized = true;
-	}
-
-	iter.allPositions(pos, MSpace::kWorld);
-
-
-	if (envelopeV < SMALL ) 
-	{
-		return MS::kSuccess;
-	}
-
-	int size = iter.exactCount();
-	int i,n ;
-	MVector delta,v1,v2,cross;
-
-	double weight;
-	MMatrix mat;
-
-    averageRelax(pos, targetPos, iterationsV, amountV);
-	if (iterationsV == 0 )
-		return MS::kSuccess;
 	
-	for (i = 0 ; i <size;i++)
-	{
-		delta = MVector(0,0,0);
-		if (applyDeltaV >= SMALL )
-		{
-	
-		
-			for (n = 0; n<dataPoints[i].size-1; n++)
-			{
-				v1 = targetPos[ dataPoints[i].neighbours[n] ] - targetPos[i] ;
-				v2 = targetPos[ dataPoints[i].neighbours[n+1] ] - targetPos[i] ;
-						
-				v2.normalize();
-				v1.normalize();
+    MPlug refMeshPlug( thisMObject(), referenceMesh );
+    if (envelopeV > SMALL && iterationsV > 0 && refMeshPlug.isConnected() ) 
+    {
+        // Getting needed data
+        double applyDeltaV = data.inputValue(applyDelta).asDouble();
+        double amountV = data.inputValue(amount).asDouble();
+        bool rebindV = data.inputValue(rebind).asBool();
+        double globalScaleV = data.inputValue( globalScale).asDouble();
 
-				cross = v1 ^ v2;
-				v2 = cross ^ v1;
-				 
-				mat = MMatrix();
-				mat[0][0] = v1.x;
-				mat[0][1] = v1.y;
-				mat[0][2] = v1.z;
-				mat[0][3] = 0;
-				mat[1][0] = v2.x;
-				mat[1][1] = v2.y;
-				mat[1][2] = v2.z;
-				mat[1][3] = 0;
-				mat[2][0] = cross.x;
-				mat[2][1] = cross.y;
-				mat[2][2] = cross.z;
-				mat[2][3] = 0;
-				mat[3][0] = 0;
-				mat[3][1] = 0;
-				mat[3][2] = 0;
-				mat[3][3] = 1;
+        if (initialized == false|| rebindV == true)
+        {
+            MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
+            pos.setLength(iter.exactCount());	
+            targetPos.setLength(iter.exactCount());
+            rebindData(referenceMeshV, iterationsV,amountV);
+            initialized = true;
+        }
 
-				delta += (  dataPoints[i].delta[n]* mat );
-			}
-		}
+        iter.allPositions(pos, MSpace::kWorld);
 
-		delta /= float(dataPoints[i].size);
-		delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
 
-		delta = (targetPos[i]+delta) - pos[i];
-		
-		weight = weightValue(data, mIndex, i);
-		pos[i] = pos[i] + (delta * weight * envelopeV);
+        //reversed ife statement in order to have common case as a first and help
+        //instructio cache 
 
-	}
+        int size = iter.exactCount();
+        int i,n ;
+        MVector delta,v1,v2,cross;
 
-	iter.setAllPositions(pos);
+        double weight;
+        MMatrix mat;
 
-	return MStatus::kSuccess ; 
+        averageRelax(pos, targetPos, iterationsV, amountV);
+
+        for (i = 0 ; i <size;i++)
+        {
+            delta = MVector(0,0,0);
+            if (applyDeltaV >= SMALL )
+            {
+
+
+                for (n = 0; n<dataPoints[i].size-1; n++)
+                {
+                    v1 = targetPos[ dataPoints[i].neighbours[n] ] - targetPos[i] ;
+                    v2 = targetPos[ dataPoints[i].neighbours[n+1] ] - targetPos[i] ;
+
+                    v2.normalize();
+                    v1.normalize();
+
+                    cross = v1 ^ v2;
+                    v2 = cross ^ v1;
+
+                    mat = MMatrix();
+                    mat[0][0] = v1.x;
+                    mat[0][1] = v1.y;
+                    mat[0][2] = v1.z;
+                    mat[0][3] = 0;
+                    mat[1][0] = v2.x;
+                    mat[1][1] = v2.y;
+                    mat[1][2] = v2.z;
+                    mat[1][3] = 0;
+                    mat[2][0] = cross.x;
+                    mat[2][1] = cross.y;
+                    mat[2][2] = cross.z;
+                    mat[2][3] = 0;
+                    mat[3][0] = 0;
+                    mat[3][1] = 0;
+                    mat[3][2] = 0;
+                    mat[3][3] = 1;
+
+                    delta += (  dataPoints[i].delta[n]* mat );
+                }
+            }
+
+            delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
+            delta = (targetPos[i]+delta) - pos[i];
+
+            weight = weightValue(data, mIndex, i);
+            pos[i] = pos[i] + (delta * weight * envelopeV);
+
+        }
+
+        iter.setAllPositions(pos);
+    }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
+
+    return MStatus::kSuccess ; 
 }
 
 
@@ -353,7 +344,11 @@ void DeltaMush::computeDelta(MPointArray& source ,
 	}
 }
 
+void DeltaMush::getWeights(MDataBlock data)
+{
+    std::cout<<"computing weights"<<std::endl;
 
+}
 void DeltaMush::rebindData(		MObject &mesh,
 									int iter,
 									double amount

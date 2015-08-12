@@ -6,7 +6,7 @@
 #include <maya/MPointArray.h>
 #include <vector>
 #include <maya/MGlobal.h>
-
+#include <maya/MFloatArray.h>
 #ifndef _DeltaMush
 #define _DeltaMush
 
@@ -47,6 +47,7 @@ private:
 						int iter,
 						double amount
 					);
+    void getWeights(MDataBlock data);
 
 
 public :
@@ -67,6 +68,7 @@ private :
     
     MPointArray * src;
     MPointArray * trg;
+    MFloatArray wgts;
     std::vector<point_data> dataPoints;
 	bool initialized;
 
