@@ -1,24 +1,39 @@
+
+#configuring home enviroment
 ifeq ($(USER), giordi)
 include buildconfig_home
+TOP= /usr/autodesk/maya2016/devkit/plug-ins
+
+#cuda configuration
+CUDA_LIB = -lcudart -lcudadevrt
+CUDA_PATH = "/usr/local/cuda-6.5"
+CUDA_LIB_PATH = -L /usr/local/cuda/lib64
+NVCC = $(CUDA_PATH)/bin/nvcc
+CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
+
+else ifeq ($(USER),mog)
+include buildconfig
+TOP= $(MAYA_LOCATION)/devkit/plug-ins
 endif
 
-
-.SUFFIXES: .cpp .o .cu .h
-TARGET= deltaMush.so
-TOP=/usr/autodesk/maya2016/devkit/plug-ins
+#defining source directory
 SRCDIR=.
 
+#extra flags for maya 2016
+ifeq (mayaVersion,2016)
+C++FLAGS += -ftemplate-depth=50 -std=c++11 
+endif
 
-#CUDA_LIB = -lcudart -lcudadevrt
-#CUDA_PATH = "/usr/local/cuda-6.5"
-#CUDA_LIB_PATH = -L /usr/local/cuda/lib64
-#NVCC = $(CUDA_PATH)/bin/nvcc
-#CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
+.SUFFIXES: .cpp .o .cu .h
 
-all : deltaMush.o pluginMain.o 
+#what I want to compile
+TARGET= deltaMush.so
+OBJS = deltaMush.o pluginMain.o 
+
+all : $(OBJS) 
 	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation 
 %.o: %.cpp
-	$(CXX) $(C++FLAGS) -ftemplate-depth=50  $(INCLUDES) -c $< -o $@ -std=c++11
+	$(CXX) $(C++FLAGS) $(INCLUDES) -c $< -o $@ 
 %.cu.o: %.cu
 	$(NVCC) $(CUDA_FLAGS) -c $< -o $@
 clean:
