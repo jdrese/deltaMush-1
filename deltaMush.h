@@ -47,7 +47,7 @@ private:
 						int iter,
 						double amount
 					);
-    void getWeights(MDataBlock data);
+    void getWeights(MDataBlock data, int size);
 
 
 public :

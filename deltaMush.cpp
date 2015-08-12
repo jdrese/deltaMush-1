@@ -14,6 +14,7 @@
 #include <maya/MPlug.h>
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MArrayDataBuilder.h>
+#include <maya/MFnFloatArrayData.h>
 
 #define SMALL (float)1e-6
 
@@ -145,12 +146,16 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         bool rebindV = data.inputValue(rebind).asBool();
         double globalScaleV = data.inputValue( globalScale).asDouble();
 
-        if (initialized == false|| rebindV == true)
+        int size = iter.exactCount();
+        if (initialized == false || rebindV == true)
         {
             MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
-            pos.setLength(iter.exactCount());	
-            targetPos.setLength(iter.exactCount());
+            pos.setLength(size);	
+            targetPos.setLength(size);
             rebindData(referenceMeshV, iterationsV,amountV);
+
+            //read weights
+            getWeights(data,size);
             initialized = true;
         }
 
@@ -160,13 +165,11 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         //reversed ife statement in order to have common case as a first and help
         //instructio cache 
 
-        int size = iter.exactCount();
         int i,n ;
         MVector delta,v1,v2,cross;
 
-        double weight;
+        float weight;
         MMatrix mat;
-
         averageRelax(pos, targetPos, iterationsV, amountV);
 
         for (i = 0 ; i <size;i++)
@@ -212,8 +215,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
             delta = (targetPos[i]+delta) - pos[i];
 
-            weight = weightValue(data, mIndex, i);
-            pos[i] = pos[i] + (delta * weight * envelopeV);
+            //weight = weightValue(data, mIndex, i);
+            //pos[i] = pos[i] + (delta * weight * envelopeV);
+            
+            pos[i] = pos[i] + (delta * wgts[i] * envelopeV);
 
         }
 
@@ -344,10 +349,40 @@ void DeltaMush::computeDelta(MPointArray& source ,
 	}
 }
 
-void DeltaMush::getWeights(MDataBlock data)
+void DeltaMush::getWeights(MDataBlock data, int size)
 {
-    std::cout<<"computing weights"<<std::endl;
+    //std::cout<<"computing weights"<<std::endl;
+    MArrayDataHandle inWeightH = data.inputArrayValue(weightList);
+    int c = inWeightH.elementCount(); 
+    wgts.setLength(size);
+    if (c>0)
+    { 
+       MStatus stat = inWeightH.jumpToElement(0);
+       
+       MDataHandle targetListFirst= inWeightH.inputValue(&stat);
+       MDataHandle weightFirst= targetListFirst.child(weights); 
+       MArrayDataHandle weightArrH(weightFirst);
+       int elem = weightArrH.elementCount();
+       weightArrH.jumpToElement(0);
+       
+       for(int i=0; i<elem; i++, weightArrH.next())
+       {
+            wgts[i] = weightArrH.inputValue().asFloat();
 
+       }
+
+    }
+    else
+    {
+       for(int i=0; i<size; i++ )
+       {
+            wgts[i] = 1.0f;
+
+       }
+    }
+
+       
+       
 }
 void DeltaMush::rebindData(		MObject &mesh,
 									int iter,
