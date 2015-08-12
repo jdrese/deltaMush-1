@@ -63,11 +63,12 @@ public :
 private :
 	MPointArray targetPos;
 	MPointArray pos;
-	std::vector<point_data> dataPoints;
-	bool initialized;
-
-
+	MPointArray copy;
     
+    MPointArray * src;
+    MPointArray * trg;
+    std::vector<point_data> dataPoints;
+	bool initialized;
 
 };
 #endif

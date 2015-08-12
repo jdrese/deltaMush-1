@@ -31,6 +31,7 @@ MObject DeltaMush::globalScale;
 //TODO
 //better average calculation using pointer and not deep copy
 //avoid usage of final array and try to use final buffer
+//check if possible to avoid normalization and do a simple average
 //move variable declaration in header and move all attribute pull in pre-load / set dep dirty?
 //move the ifs statement that leads to return in one 
 //reverse  if statement to make most likely choice as first to help instruction cache
@@ -148,12 +149,13 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 	bool rebindV = data.inputValue(rebind).asBool();
 	double globalScaleV = data.inputValue( globalScale).asDouble();
 
-	if (initialized == 0 || rebindV == true)
+	if (initialized == false|| rebindV == true)
 	{
   	    MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
 	    pos.setLength(iter.exactCount());	
+        targetPos.setLength(iter.exactCount());
         rebindData(referenceMeshV, iterationsV,amountV);
-		initialized = 1;
+		initialized = true;
 	}
 
 	iter.allPositions(pos, MSpace::kWorld);
@@ -170,14 +172,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
 	double weight;
 	MMatrix mat;
-	MPointArray final;
-	
+
     averageRelax(pos, targetPos, iterationsV, amountV);
 	if (iterationsV == 0 )
 		return MS::kSuccess;
-	else
-		final.copy(targetPos);
-	
 	
 	for (i = 0 ; i <size;i++)
 	{
@@ -219,25 +217,59 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 			}
 		}
 
-
-		delta /= double(dataPoints[i].size);
+		delta /= float(dataPoints[i].size);
 		delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
-		final[i] += delta;
 
-		delta = final[i] - pos[i];
+		delta = (targetPos[i]+delta) - pos[i];
 		
 		weight = weightValue(data, mIndex, i);
-		final[i] = pos[i] + (delta * weight * envelopeV);
+		pos[i] = pos[i] + (delta * weight * envelopeV);
 
 	}
-	
 
-	iter.setAllPositions(final);
+	iter.setAllPositions(pos);
 
 	return MStatus::kSuccess ; 
 }
 
 
+
+void DeltaMush::averageRelax( MPointArray& source ,
+					   MPointArray& target , int iter,
+					   double amountV)
+{
+	int size = source.length();
+	copy.copy(source);
+    
+    //initializing references
+    MPointArray &srcR = copy;
+    MPointArray &trgR= target;
+    MPointArray &tmp = copy;	
+    
+    MVector temp;
+	int i , n , it;
+	
+    for (it = 0; it < iter ; it++)
+	{
+		for (i = 0 ; i < size ; i++)
+		{
+			temp = MVector(0,0,0);
+			for (n = 0; n<dataPoints[i].size; n++)
+			{
+                temp += srcR[dataPoints[i].neighbours[n]];					
+			}
+
+			temp/= float(dataPoints[i].size);
+			
+			trgR[i] =srcR[i] +  (temp - srcR[i] )*amountV;
+	
+		}
+	
+        tmp=srcR;
+        srcR = trgR;
+        trgR = tmp;
+    }
+}
 void DeltaMush::initData(
     			 MObject &mesh,
     			 int iters)
@@ -253,7 +285,6 @@ void DeltaMush::initData(
 	iter.reset();
 	meshFn.getPoints(pos , MSpace::kWorld);
 	
-
 	MVectorArray arr;
 	for (int i = 0; i < size; i++,iter.next())
 	{
@@ -269,41 +300,6 @@ void DeltaMush::initData(
 		
 		 
 	}
-
-}
-
-void DeltaMush::averageRelax( MPointArray& source ,
-					   MPointArray& target , int iter,
-					   double amountV)
-{
-
-
-	int size = source.length();
-	target.setLength(size);
-	
-	MPointArray copy;
-	copy.copy(source);
-
-	MVector temp;
-	int i , n , it;
-	for (it = 0; it < iter ; it++)
-	{
-		for (i = 0 ; i < size ; i++)
-		{
-			temp = MVector(0,0,0);
-			for (n = 0; n<dataPoints[i].size; n++)
-			{
-					temp += copy[dataPoints[i].neighbours[n]];					
-			}
-
-			temp/= double(dataPoints[i].size);
-			
-			target[i] =copy[i] +  (temp - copy[i] )*amountV;
-	
-		}
-		copy.copy(target);
-	}
-
 
 }
 
