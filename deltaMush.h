@@ -10,7 +10,7 @@
 #ifndef _DeltaMush
 #define _DeltaMush
 
-
+typedef unsigned int uint;
 struct point_data
 {
 	MIntArray neighbours;
@@ -60,6 +60,7 @@ public :
 	static MObject		amount;
 	static MObject		mapMult;
     static MObject		globalScale;
+    const static unsigned int MAX_NEIGH;
 
 private :
 	MPointArray targetPos;
@@ -70,7 +71,9 @@ private :
     MPointArray * trg;
     MFloatArray wgts;
     std::vector<point_data> dataPoints;
-	bool initialized;
+    std::vector<int> neigh_table;
+	
+    bool initialized;
 
 };
 #endif
