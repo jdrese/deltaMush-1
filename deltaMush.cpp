@@ -172,7 +172,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         //float weight;
         MMatrix mat;
         averageRelax(pos, targetPos, iterationsV, amountV);
-        int counter =0;
         int ne =0;
         if (applyDeltaV >= SMALL )
         {
