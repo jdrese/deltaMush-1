@@ -20,8 +20,8 @@ endif
 SRCDIR=.
 
 #extra flags for maya 2016
-ifeq (mayaVersion,2016)
-C++FLAGS += -ftemplate-depth=50 -std=c++11 
+ifeq ($(mayaVersion),2016)
+C++FLAGS += -ftemplate-depth=50 -std=c++11 -funroll-loops
 endif
 
 .SUFFIXES: .cpp .o .cu .h

@@ -174,6 +174,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         //float weight;
         MMatrix mat;
         averageRelax(pos, targetPos, iterationsV, amountV);
+        int counter =0;
+        int ne =0;
         if (applyDeltaV >= SMALL )
         {
 
@@ -181,11 +183,14 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             {
                 delta = MVector(0,0,0);
 
-
-                for (n = 0; n<dataPoints[i].size-1; n++)
+                counter = 0;
+                for (n = 0; n< MAX_NEIGH -1 ;n++)
                 {
-                    v1 = targetPos[ dataPoints[i].neighbours[n] ] - targetPos[i] ;
-                    v2 = targetPos[ dataPoints[i].neighbours[n+1] ] - targetPos[i] ;
+                    ne = i*MAX_NEIGH + n; 
+                    if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
+                    {
+                    v1 = targetPos[ neigh_table[ne] ] - targetPos[i] ;
+                    v2 = targetPos[ neigh_table [ne+1] ] - targetPos[i] ;
 
                     v2.normalize();
                     v1.normalize();
@@ -212,6 +217,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                     mat[3][3] = 1;
 
                     delta += (  dataPoints[i].delta[n]* mat );
+                    
+                    }
                 }
 
                 delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
