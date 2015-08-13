@@ -334,19 +334,21 @@ void DeltaMush::initData(
 	meshFn.getPoints(pos , MSpace::kWorld);
 	
 	MVectorArray arr;
+    MIntArray neig_tmp;
+    int nsize;
 	for (int i = 0; i < size; i++,iter.next())
 	{
 		point_data pt;
 
-		iter.getConnectedVertices(pt.neighbours);	
-		pt.size = pt.neighbours.length();
+		iter.getConnectedVertices(neig_tmp);	
+		pt.size = neig_tmp.length();
 		dataPoints[i] = pt;
         if (pt.size>=MAX_NEIGH)
         {
-           neigh_table[i*MAX_NEIGH] = pt.neighbours[0];
-           neigh_table[(i*MAX_NEIGH)+1] = pt.neighbours[1];
-           neigh_table[(i*MAX_NEIGH)+2] = pt.neighbours[2];
-           neigh_table[(i*MAX_NEIGH)+3] = pt.neighbours[3];
+           neigh_table[i*MAX_NEIGH] = neig_tmp[0];
+           neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
+           neigh_table[(i*MAX_NEIGH)+2] = neig_tmp[2];
+           neigh_table[(i*MAX_NEIGH)+3] = neig_tmp[3];
         } 
         else
         {
@@ -354,7 +356,7 @@ void DeltaMush::initData(
             {
                if(n<pt.size)
                {
-                    neigh_table[(i*MAX_NEIGH)+n] = pt.neighbours[n];
+                    neigh_table[(i*MAX_NEIGH)+n] = neig_tmp[n];
                } 
                else
                 {
@@ -362,17 +364,6 @@ void DeltaMush::initData(
                 }
             }
         }
-        /*
-        if (i==113)
-        {
-            std::cout<<pt.neighbours<<std::endl;
-            std::cout<<pt.neighbours<<std::endl;
-            std::cout<<neigh_table[i*MAX_NEIGH] <<std::endl;
-             std::cout<<        neigh_table[(i*MAX_NEIGH)+1] <<std::endl;
-              std::cout<<       neigh_table[(i*MAX_NEIGH)+2] <<std::endl;
-               std::cout<<      neigh_table[(i*MAX_NEIGH)+3]<<std::endl;;
-        }       
-        */
 		arr = MVectorArray();
 		arr.setLength(pt.size);
 		dataPoints[i].delta = arr;
@@ -387,7 +378,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 	int size = source.length();
 	MVectorArray arr;
 	MVector delta , v1 , v2 , cross;
-	int i , n ;
+	int i , n,ne ;
 	MMatrix mat;
 	//build the matrix
 	for ( i = 0 ; i < size ; i++)
@@ -397,10 +388,14 @@ void DeltaMush::computeDelta(MPointArray& source ,
 
 		dataPoints[i].deltaLen = delta.length();
 		//get tangent matrices
-		for (n = 0; n<dataPoints[i].size-1; n++)
+		for (n = 0; n<MAX_NEIGH-1; n++)
 		{
-			v1 = target[ dataPoints[i].neighbours[n] ] - target[i] ;
-			v2 = target[ dataPoints[i].neighbours[n+1] ] - target[i] ;
+                    ne = i*MAX_NEIGH + n; 
+                    
+                    if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
+                    {
+			v1 = target[ neigh_table[ne] ] - target[i] ;
+			v2 = target[ neigh_table[ne+1] ] - target[i] ;
 					 
 			v2.normalize();
 			v1.normalize();
@@ -427,6 +422,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 			mat[3][3] = 1;
 
 			dataPoints[i].delta[n] = MVector( delta  * mat.inverse());
+                    }
 		}
 	}
 }

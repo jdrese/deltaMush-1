@@ -13,7 +13,7 @@
 typedef unsigned int uint;
 struct point_data
 {
-	MIntArray neighbours;
+	//MIntArray neighbours;
 	MVectorArray delta;
 	int size;
 	double deltaLen;
