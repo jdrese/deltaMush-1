@@ -15,7 +15,6 @@
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MArrayDataBuilder.h>
 #include <maya/MFnFloatArrayData.h>
-
 #define SMALL (float)1e-6
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
@@ -48,7 +47,6 @@ MObject DeltaMush::globalScale;
 //worth considering data refactorying of pos n n n n pos n n n n to ensure cache friendliness? though this is just a guess
 //the data refactoring might very well be slower but having a flat buffer of neighbour might help rather then package the point with all the data
 //possible gpu?
-
 
 DeltaMush::DeltaMush()
 {
@@ -183,41 +181,41 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             {
                 delta = MVector(0,0,0);
 
-                counter = 0;
                 for (n = 0; n< MAX_NEIGH -1 ;n++)
                 {
                     ne = i*MAX_NEIGH + n; 
+                    
                     if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
                     {
-                    v1 = targetPos[ neigh_table[ne] ] - targetPos[i] ;
-                    v2 = targetPos[ neigh_table [ne+1] ] - targetPos[i] ;
+                        v1 = targetPos[ neigh_table[ne] ] - targetPos[i] ;
+                        v2 = targetPos[ neigh_table [ne+1] ] - targetPos[i] ;
 
-                    v2.normalize();
-                    v1.normalize();
+                        v2.normalize();
+                        v1.normalize();
 
-                    cross = v1 ^ v2;
-                    v2 = cross ^ v1;
+                        cross = v1 ^ v2;
+                        v2 = cross ^ v1;
 
-                    mat = MMatrix();
-                    mat[0][0] = v1.x;
-                    mat[0][1] = v1.y;
-                    mat[0][2] = v1.z;
-                    mat[0][3] = 0;
-                    mat[1][0] = v2.x;
-                    mat[1][1] = v2.y;
-                    mat[1][2] = v2.z;
-                    mat[1][3] = 0;
-                    mat[2][0] = cross.x;
-                    mat[2][1] = cross.y;
-                    mat[2][2] = cross.z;
-                    mat[2][3] = 0;
-                    mat[3][0] = 0;
-                    mat[3][1] = 0;
-                    mat[3][2] = 0;
-                    mat[3][3] = 1;
+                        mat = MMatrix();
+                        mat[0][0] = v1.x;
+                        mat[0][1] = v1.y;
+                        mat[0][2] = v1.z;
+                        mat[0][3] = 0;
+                        mat[1][0] = v2.x;
+                        mat[1][1] = v2.y;
+                        mat[1][2] = v2.z;
+                        mat[1][3] = 0;
+                        mat[2][0] = cross.x;
+                        mat[2][1] = cross.y;
+                        mat[2][2] = cross.z;
+                        mat[2][3] = 0;
+                        mat[3][0] = 0;
+                        mat[3][1] = 0;
+                        mat[3][2] = 0;
+                        mat[3][3] = 1;
 
-                    delta += (  dataPoints[i].delta[n]* mat );
-                    
+                        delta += (  dataPoints[i].delta[n]* mat );
+
                     }
                 }
 
