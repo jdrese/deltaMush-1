@@ -7,18 +7,13 @@
 #include <vector>
 #include <maya/MGlobal.h>
 #include <maya/MFloatArray.h>
+
+#include <tbb/task_scheduler_init.h>
+
 #ifndef _DeltaMush
 #define _DeltaMush
 
 typedef unsigned int uint;
-/*
-struct point_data
-{
-	//MIntArray neighbours;
-	//MVectorArray delta;
-	//double deltaLen;
-};
-*/
 
 using namespace std;
 
@@ -68,12 +63,10 @@ private :
 	MPointArray pos;
 	MPointArray copy;
     
-    MPointArray * src;
-    MPointArray * trg;
     MFloatArray wgts;
-    //std::vector<point_data> dataPoints;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
+    tbb::task_scheduler_init init;
 	
     bool initialized;
 

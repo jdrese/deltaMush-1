@@ -15,7 +15,11 @@
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MArrayDataBuilder.h>
 #include <maya/MFnFloatArrayData.h>
+#include <tbb/parallel_for.h>
+
 #define SMALL (float)1e-6
+
+
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const unsigned int DeltaMush::MAX_NEIGH =4;
@@ -35,8 +39,8 @@ MObject DeltaMush::globalScale;
 //check if possible to avoid normalization and do a simple average =
 //move the ifs statement that leads to return in one X 
 //reverse  if statement to make most likely choice as first to help instruction cache X
-//change neighbourood to a max of 4 so we can have a flatter array and we can unroll inner neighbour loop
-//use data structures that are not maya (like the arrays)
+//change neighbourood to a max of 4 so we can have a flatter array and we can unroll inner neighbour loopX
+//use data structures that are not maya (like the arrays) X
 //move variable declaration in header and move all attribute pull in pre-load / set dep dirty?
 //make average parallel
 //make delta computation parallel
@@ -49,9 +53,8 @@ MObject DeltaMush::globalScale;
 //possible gpu?
 //sorting vertex based on neighbours bucket?
 
-DeltaMush::DeltaMush()
+DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
 {
-	initialized = 0 ;
 	targetPos.setLength(0);
 }
 
@@ -162,11 +165,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             initialized = true;
         }
 
-        iter.allPositions(pos, MSpace::kWorld);
+        iter.allPositions(pos, MSpace::kObject);
 
-
-        //reversed ife statement in order to have common case as a first and help
-        //instructio cache 
 
         int i,n ;
         MVector delta,v1,v2,cross;
@@ -222,13 +222,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                     }
                 }
 
-                //delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
                 delta= (delta/float(counter))*applyDeltaV*globalScaleV; 
                 delta = (targetPos[i]+delta) - pos[i];
-
-                //weight = weightValue(data, mIndex, i);
-                //pos[i] = pos[i] + (delta * weight * envelopeV);
-
                 pos[i] = pos[i] + (delta * wgts[i] * envelopeV);
             }
         iter.setAllPositions(pos);
@@ -260,32 +255,6 @@ void DeltaMush::averageRelax( MPointArray& source ,
     
     MVector temp;
 	int i , n , it;
-    /*	
-    for (it = 0; it < iter ; it++)
-	{
-		for (i = 0 ; i < size ; i++)
-		{
-			temp = MVector(0,0,0);
-			for (n = 0; n<dataPoints[i].size; n++)
-			{
-                if(i==113)
-                {
-                    std::cout<<srcR[dataPoints[i].neighbours[n]]<<std::endl;
-                }
-                temp += srcR[dataPoints[i].neighbours[n]];					
-			}
-
-			temp/= float(dataPoints[i].size);
-			
-			trgR[i] =srcR[i] +  (temp - srcR[i] )*amountV;
-	
-		}
-	
-        tmp=srcR;
-        srcR = trgR;
-        trgR = tmp;
-    }
-    */ 
     int counter =0;
     int ne =0; 
     for (it = 0; it < iter ; it++)
@@ -309,13 +278,9 @@ void DeltaMush::averageRelax( MPointArray& source ,
                     counter +=1;
                 }
 			}
-
 			temp/= float(counter);
-			
 			trgR[i] =srcR[i] +  (temp - srcR[i] )*amountV;
-	
 		}
-	
         tmp=srcR;
         srcR = trgR;
         trgR = tmp;
@@ -329,8 +294,6 @@ void DeltaMush::initData(
 
 	MFnMesh meshFn(mesh);
 	int size = meshFn.numVertices();
-
-	//dataPoints.resize(size);
 
 	MPointArray pos,res;
 	MItMeshVertex iter(mesh);
@@ -368,11 +331,6 @@ void DeltaMush::initData(
                 }
             }
         }
-		//arr = MVectorArray();
-		//arr.setLength(nsize);
-		//dataPoints[i].delta = arr;
-		
-		 
 	}
 }
 
@@ -425,7 +383,6 @@ void DeltaMush::computeDelta(MPointArray& source ,
 			mat[3][2] = 0;
 			mat[3][3] = 1;
 
-			//dataPoints[i].delta[n] = MVector( delta  * mat.inverse());
             delta_table[ne] =  MVector( delta  * mat.inverse());
 
                     }
@@ -435,7 +392,6 @@ void DeltaMush::computeDelta(MPointArray& source ,
 
 void DeltaMush::getWeights(MDataBlock data, int size)
 {
-    //std::cout<<"computing weights"<<std::endl;
     MArrayDataHandle inWeightH = data.inputArrayValue(weightList);
     int c = inWeightH.elementCount(); 
     wgts.setLength(size);
@@ -473,7 +429,6 @@ void DeltaMush::rebindData(		MObject &mesh,
 									double amount
 								)
 {
-
 	initData(mesh , iter);
 	MPointArray posRev,back;
 	MFnMesh meshFn(mesh);
@@ -481,8 +436,6 @@ void DeltaMush::rebindData(		MObject &mesh,
 	back.copy(posRev);
 	averageRelax(posRev , back, iter, amount);
 	computeDelta(posRev ,back);
-
-
 }
 
 MStatus DeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray )
