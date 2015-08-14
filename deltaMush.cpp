@@ -216,7 +216,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                         mat[3][2] = 0;
                         mat[3][3] = 1;
 
-                        delta += (  dataPoints[i].delta[n]* mat );
+                        //delta += (  dataPoints[i].delta[n]* mat );
+                        delta += (  delta_table[ne]* mat );
                         counter++;
                     }
                 }
@@ -329,7 +330,7 @@ void DeltaMush::initData(
 	MFnMesh meshFn(mesh);
 	int size = meshFn.numVertices();
 
-	dataPoints.resize(size);
+	//dataPoints.resize(size);
 
 	MPointArray pos,res;
 	MItMeshVertex iter(mesh);
@@ -341,11 +342,11 @@ void DeltaMush::initData(
     int nsize;
 	for (int i = 0; i < size; i++,iter.next())
 	{
-		point_data pt;
+		//point_data pt;
 
 		iter.getConnectedVertices(neig_tmp);	
 		nsize = neig_tmp.length();
-		dataPoints[i] = pt;
+		//dataPoints[i] = pt;
         if (nsize>=MAX_NEIGH)
         {
            neigh_table[i*MAX_NEIGH] = neig_tmp[0];
@@ -367,9 +368,9 @@ void DeltaMush::initData(
                 }
             }
         }
-		arr = MVectorArray();
-		arr.setLength(nsize);
-		dataPoints[i].delta = arr;
+		//arr = MVectorArray();
+		//arr.setLength(nsize);
+		//dataPoints[i].delta = arr;
 		
 		 
 	}
@@ -424,8 +425,9 @@ void DeltaMush::computeDelta(MPointArray& source ,
 			mat[3][2] = 0;
 			mat[3][3] = 1;
 
-			dataPoints[i].delta[n] = MVector( delta  * mat.inverse());
-            
+			//dataPoints[i].delta[n] = MVector( delta  * mat.inverse());
+            delta_table[ne] =  MVector( delta  * mat.inverse());
+
                     }
 		}
 	}

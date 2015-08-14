@@ -11,12 +11,14 @@
 #define _DeltaMush
 
 typedef unsigned int uint;
+/*
 struct point_data
 {
 	//MIntArray neighbours;
-	MVectorArray delta;
+	//MVectorArray delta;
 	//double deltaLen;
 };
+*/
 
 using namespace std;
 
@@ -69,7 +71,7 @@ private :
     MPointArray * src;
     MPointArray * trg;
     MFloatArray wgts;
-    std::vector<point_data> dataPoints;
+    //std::vector<point_data> dataPoints;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
 	
