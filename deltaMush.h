@@ -15,8 +15,7 @@ struct point_data
 {
 	//MIntArray neighbours;
 	MVectorArray delta;
-	int size;
-	double deltaLen;
+	//double deltaLen;
 };
 
 using namespace std;
@@ -72,6 +71,7 @@ private :
     MFloatArray wgts;
     std::vector<point_data> dataPoints;
     std::vector<int> neigh_table;
+    std::vector<MVector> delta_table;
 	
     bool initialized;
 

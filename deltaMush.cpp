@@ -47,6 +47,7 @@ MObject DeltaMush::globalScale;
 //worth considering data refactorying of pos n n n n pos n n n n to ensure cache friendliness? though this is just a guess
 //the data refactoring might very well be slower but having a flat buffer of neighbour might help rather then package the point with all the data
 //possible gpu?
+//sorting vertex based on neighbours bucket?
 
 DeltaMush::DeltaMush()
 {
@@ -152,6 +153,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             pos.setLength(size);	
             targetPos.setLength(size);
             neigh_table.resize(size *MAX_NEIGH);
+            delta_table.resize(size *MAX_NEIGH);
             rebindData(referenceMeshV, iterationsV,amountV);
 
 
@@ -173,13 +175,14 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         MMatrix mat;
         averageRelax(pos, targetPos, iterationsV, amountV);
         int ne =0;
+        int counter =0;
         if (applyDeltaV >= SMALL )
         {
 
             for (i = 0 ; i <size;i++)
             {
                 delta = MVector(0,0,0);
-
+                counter =0;
                 for (n = 0; n< MAX_NEIGH -1 ;n++)
                 {
                     ne = i*MAX_NEIGH + n; 
@@ -214,11 +217,12 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                         mat[3][3] = 1;
 
                         delta += (  dataPoints[i].delta[n]* mat );
-
+                        counter++;
                     }
                 }
 
-                delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
+                //delta = delta.normal() * (dataPoints[i].deltaLen*applyDeltaV*globalScaleV); 
+                delta= (delta/float(counter))*applyDeltaV*globalScaleV; 
                 delta = (targetPos[i]+delta) - pos[i];
 
                 //weight = weightValue(data, mIndex, i);
@@ -340,9 +344,9 @@ void DeltaMush::initData(
 		point_data pt;
 
 		iter.getConnectedVertices(neig_tmp);	
-		pt.size = neig_tmp.length();
+		nsize = neig_tmp.length();
 		dataPoints[i] = pt;
-        if (pt.size>=MAX_NEIGH)
+        if (nsize>=MAX_NEIGH)
         {
            neigh_table[i*MAX_NEIGH] = neig_tmp[0];
            neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
@@ -353,7 +357,7 @@ void DeltaMush::initData(
         {
             for (int n =0; n<MAX_NEIGH;n++)
             {
-               if(n<pt.size)
+               if(n<nsize)
                {
                     neigh_table[(i*MAX_NEIGH)+n] = neig_tmp[n];
                } 
@@ -364,7 +368,7 @@ void DeltaMush::initData(
             }
         }
 		arr = MVectorArray();
-		arr.setLength(pt.size);
+		arr.setLength(nsize);
 		dataPoints[i].delta = arr;
 		
 		 
@@ -385,7 +389,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 		
 		delta = MVector ( source[i] - target[i] );
 
-		dataPoints[i].deltaLen = delta.length();
+		//dataPoints[i].deltaLen = delta.length();
 		//get tangent matrices
 		for (n = 0; n<MAX_NEIGH-1; n++)
 		{
@@ -421,6 +425,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 			mat[3][3] = 1;
 
 			dataPoints[i].delta[n] = MVector( delta  * mat.inverse());
+            
                     }
 		}
 	}
