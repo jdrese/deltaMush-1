@@ -168,29 +168,26 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         iter.allPositions(pos, MSpace::kObject);
 
-
-        int i,n ;
-        MVector delta,v1,v2,cross;
-
-        //float weight;
-        MMatrix mat;
-        //averageRelax(pos, targetPos, iterationsV, amountV);
-         
+        //We need to work on a copy due to the fact that we need to preserve the original position 
+        //for blending afterwards 
+        
         copy.copy(pos);
-        MPointArray &srcR = copy;
-        MPointArray &trgR= targetPos;
-        MPointArray &tmp = copy;	
-        Average_tbb kernel(srcR, trgR, iterationsV ,amountV, neigh_table);
+        //here we invert already the source and targets since the swap appens before computtion and not 
+        //afterwards, the reason for that is in this way we are always sure that the final result is in the 
+        //target pointer
+        MPointArray * srcR = &targetPos;
+        MPointArray * trgR= &copy;
         int it =0;
         for (it = 0; it < iterationsV; it++)
         {
+            swap(srcR, trgR);
+            Average_tbb kernel(srcR, trgR, iterationsV ,amountV, neigh_table);
             tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
-            tmp=srcR;
-            srcR = trgR;
-            trgR = tmp;
-
-
         }
+        
+        int i,n ;
+        MVector delta,v1,v2,cross;
+        MMatrix mat;
         
         int ne =0;
         int counter =0;
@@ -234,7 +231,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                         mat[3][2] = 0;
                         mat[3][3] = 1;
 
-                        //delta += (  dataPoints[i].delta[n]* mat );
                         delta += (  delta_table[ne]* mat );
                         counter++;
                     }
@@ -257,9 +253,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     return MStatus::kSuccess ; 
 }
 
-Average_tbb::Average_tbb(MPointArray& source ,
-					   MPointArray& target , int iter,
-					   double amountV, std::vector<int>& neigh_table): source(source), target(target), tmp(source),iter(iter), amountV(amountV), neigh_table(neigh_table)
+Average_tbb::Average_tbb(MPointArray * source ,
+					   MPointArray * target , int iter,
+					   double amountV, const std::vector<int>& neigh_table): source(source), target(target),iter(iter), amountV(amountV), neigh_table(neigh_table)
 {
     
 }
@@ -279,12 +275,12 @@ void Average_tbb::operator()( const tbb::blocked_range<size_t>& r) const
             ne = neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
             if (ne!= -1)
             {
-                temp += source[ne];					
+                temp += (*source)[ne];					
                 counter +=1;
             }
         }
         temp/= float(counter);
-        target[i] =source[i] +  (temp - source[i] )*amountV;
+        (*target)[i] =(*source)[i] +  (temp - (*source)[i] )*amountV;
     }
 
 }
@@ -436,7 +432,7 @@ void DeltaMush::getWeights(MDataBlock data, int size)
 {
     MArrayDataHandle inWeightH = data.inputArrayValue(weightList);
     int c = inWeightH.elementCount(); 
-    wgts.setLength(size);
+    wgts.resize(size);
     if (c>0)
     { 
        MStatus stat = inWeightH.jumpToElement(0);
