@@ -16,7 +16,8 @@
 #include <maya/MArrayDataBuilder.h>
 #include <maya/MFnFloatArrayData.h>
 #include <tbb/parallel_for.h>
-
+#include <Eigen/Dense>
+#include <Eigen/LU>
 #define SMALL (float)1e-6
 
 
@@ -42,8 +43,8 @@ MObject DeltaMush::globalScale;
 //change neighbourood to a max of 4 so we can have a flatter array and we can unroll inner neighbour loopX
 //use data structures that are not maya (like the arrays) X
 //move variable declaration in header and move all attribute pull in pre-load / set dep dirty?
-//make average parallel
-//make delta computation parallel
+//make average parallel X
+//make delta computation parallel X
 //make both average and delta in one parallel call with a lock? faster or not?
 //use eigen math library not maya
 //trying to enamble eigen SSE instruction or if not possible try to do some intrinsic manually?
@@ -185,71 +186,13 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
         }
         
-        /*
-        */
         if (applyDeltaV >= SMALL )
         {
-
-            
-            
             Tangent_tbb kernelT (trgR,&pos, applyDeltaV, globalScaleV, envelopeV,
                             wgts, delta_table, neigh_table);
             tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernelT);
-            
-            /*
-            int i,n ;
-            MVector delta,v1,v2,cross;
-            MMatrix mat;
-            
-            int ne =0;
-            int counter =0;
-            for (i = 0 ; i <size;i++)
-            {
-                delta = MVector(0,0,0);
-                counter =0;
-                for (n = 0; n< MAX_NEIGH -1 ;n++)
-                {
-                    ne = i*MAX_NEIGH + n; 
-                    
-                    if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
-                    {
-                        v1 = targetPos[ neigh_table[ne] ] - targetPos[i] ;
-                        v2 = targetPos[ neigh_table [ne+1] ] - targetPos[i] ;
 
-                        v2.normalize();
-                        v1.normalize();
-
-                        cross = v1 ^ v2;
-                        v2 = cross ^ v1;
-
-                        mat = MMatrix();
-                        mat[0][0] = v1.x;
-                        mat[0][1] = v1.y;
-                        mat[0][2] = v1.z;
-                        mat[0][3] = 0;
-                        mat[1][0] = v2.x;
-                        mat[1][1] = v2.y;
-                        mat[1][2] = v2.z;
-                        mat[1][3] = 0;
-                        mat[2][0] = cross.x;
-                        mat[2][1] = cross.y;
-                        mat[2][2] = cross.z;
-                        mat[2][3] = 0;
-                        mat[3][0] = 0;
-                        mat[3][1] = 0;
-                        mat[3][2] = 0;
-                        mat[3][3] = 1;
-
-                        delta += (  delta_table[ne]* mat );
-                        counter++;
-                    }
-                }
-
-                delta= (delta/float(counter))*applyDeltaV*globalScaleV; 
-                delta = (targetPos[i]+delta) - pos[i];
-                pos[i] = pos[i] + (delta * wgts[i] * envelopeV);
-            }*/
-        iter.setAllPositions(pos);
+            iter.setAllPositions(pos);
 
         }
         else
@@ -321,8 +264,8 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
         {
             ne = i*DeltaMush::MAX_NEIGH + n; 
 
-            if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
-            {
+            //if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
+            //{
                 v1 = (*source)[ neigh_table[ne] ] -(*source)[i] ;
                 v2 = (*source)[ neigh_table [ne+1] ] -  (*source)[i] ;
 
@@ -352,7 +295,7 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 
                 delta += (  delta_table[ne]* mat );
                 counter++;
-            }
+            //}
         }
 
         delta= (delta/float(counter))*applyDeltaV*globalScaleV; 
@@ -389,11 +332,11 @@ void DeltaMush::averageRelax( MPointArray& source ,
 			{
                 ne = neigh_table[(i*MAX_NEIGH) + n];
                 //need to work on this if, find a way to remove it
-                if (ne!= -1)
-                {
+                //if (ne!= -1)
+                //{
                     temp += srcR[ne];					
                     counter +=1;
-                }
+                //}
 			}
 			temp/= float(counter);
 			trgR[i] =srcR[i] +  (temp - srcR[i] )*amountV;
@@ -444,7 +387,8 @@ void DeltaMush::initData(
                } 
                else
                 {
-                    neigh_table[(i*MAX_NEIGH)+n] = -1;
+                    //neigh_table[(i*MAX_NEIGH)+n] = -1;
+                    neigh_table[(i*MAX_NEIGH)+n] = neigh_table[(i*MAX_NEIGH)];
                 }
             }
         }

@@ -2,9 +2,10 @@
 #configuring home enviroment
 ifeq ($(USER), giordi)
 include buildconfig_home
+LFAGS += -L /home/giordi/WORK_IN_PROGRESS/C/libs
 TOP= /usr/autodesk/maya2016/devkit/plug-ins
+INCLUDES += -isystem /home/giordi/WORK_IN_PROGRESS/C/libs/eigen
 
-#cuda configuration
 CUDA_LIB = -lcudart -lcudadevrt
 CUDA_PATH = "/usr/local/cuda-6.5"
 CUDA_LIB_PATH = -L /usr/local/cuda/lib64
