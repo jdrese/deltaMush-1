@@ -216,23 +216,18 @@ Average_tbb::Average_tbb(MPointArray * source ,
 void Average_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 {
 
-    int i,n,counter,ne;
+    int i,n,ne;
     MVector temp;
     for (i = r.begin() ; i < r.end() ; i++)
     {
         temp = MVector(0,0,0);
-        counter = 0;
         for (n = 0; n<DeltaMush::MAX_NEIGH; n++)
         {
             ne = neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
             //need to work on this if, find a way to remove it
-            if (ne!= -1)
-            {
                 temp += (*source)[ne];					
-                counter +=1;
-            }
         }
-        temp/= float(counter);
+        temp/= DeltaMush::MAX_NEIGH;
         (*target)[i] =(*source)[i] +  (temp - (*source)[i] )*amountV;
     }
 
