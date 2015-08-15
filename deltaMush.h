@@ -89,27 +89,33 @@ struct Average_tbb
 
 };
 
-/*
+
 struct Tangent_tbb
 {
     public:
         Tangent_tbb(MPointArray * source ,
-                double applyDeltaV,
-                double globalScaleV,
-                
-                double amountV, const std::vector<int>& neigh_table);
+                    MPointArray * original,
+                const double applyDeltaV,
+                const double globalScaleV,
+                const double envelopeV,
+                const std::vector<float> & wgts,
+                const std::vector<MVector>& delta_table,
+                const std::vector<int>& neigh_table);
 
         void operator() (const tbb::blocked_range<size_t>& r)const;
 
     private:
         MPointArray * source;
-        MPointArray * target;
-        int iter;
-        double amountV;
+        MPointArray * original;
+        const double applyDeltaV;
+        const double envelopeV;
+        const double globalScaleV;
+        const std::vector<float> & wgts;
+        const std::vector<MVector> &delta_table;
         const std::vector<int>& neigh_table;
 
 };
-*/
+
 #endif
 
 
