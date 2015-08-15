@@ -53,7 +53,8 @@ MObject DeltaMush::globalScale;
 //possible gpu?
 //sorting vertex based on neighbours bucket?
 
-DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
+//DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
+DeltaMush::DeltaMush():initialized(false), init(4)
 {
 	targetPos.setLength(0);
 }
@@ -173,7 +174,24 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         //float weight;
         MMatrix mat;
-        averageRelax(pos, targetPos, iterationsV, amountV);
+        //averageRelax(pos, targetPos, iterationsV, amountV);
+         
+        copy.copy(pos);
+        MPointArray &srcR = copy;
+        MPointArray &trgR= targetPos;
+        MPointArray &tmp = copy;	
+        Average_tbb kernel(srcR, trgR, iterationsV ,amountV, neigh_table);
+        int it =0;
+        for (it = 0; it < iterationsV; it++)
+        {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
+            tmp=srcR;
+            srcR = trgR;
+            trgR = tmp;
+
+
+        }
+        
         int ne =0;
         int counter =0;
         if (applyDeltaV >= SMALL )
@@ -239,13 +257,43 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     return MStatus::kSuccess ; 
 }
 
+Average_tbb::Average_tbb(MPointArray& source ,
+					   MPointArray& target , int iter,
+					   double amountV, std::vector<int>& neigh_table): source(source), target(target), tmp(source),iter(iter), amountV(amountV), neigh_table(neigh_table)
+{
+    
+}
 
+
+void Average_tbb::operator()( const tbb::blocked_range<size_t>& r) const
+{
+
+    int i,n,counter,ne;
+    MVector temp;
+    for (i = r.begin() ; i < r.end() ; i++)
+    {
+        temp = MVector(0,0,0);
+        counter = 0;
+        for (n = 0; n<DeltaMush::MAX_NEIGH; n++)
+        {
+            ne = neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
+            if (ne!= -1)
+            {
+                temp += source[ne];					
+                counter +=1;
+            }
+        }
+        temp/= float(counter);
+        target[i] =source[i] +  (temp - source[i] )*amountV;
+    }
+
+}
 
 void DeltaMush::averageRelax( MPointArray& source ,
 					   MPointArray& target , int iter,
 					   double amountV)
 {
-	int size = source.length();
+    int size = source.length();
 	copy.copy(source);
     
     //initializing references
@@ -266,12 +314,6 @@ void DeltaMush::averageRelax( MPointArray& source ,
             for (n = 0; n<MAX_NEIGH; n++)
 			{
                 ne = neigh_table[(i*MAX_NEIGH) + n];
-                /*
-                if(i==113)
-                {
-                    std::cout<<srcR[neigh_table[(i*MAX_NEIGH) + n]]<<std::endl;
-                }
-                */
                 if (ne!= -1)
                 {
                     temp += srcR[ne];					

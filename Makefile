@@ -19,6 +19,10 @@ endif
 #defining source directory
 SRCDIR=.
 C++FLAGS += -funroll-loops
+BUILD := release
+ifeq ($(BUILD),debug)
+C++FLAGS += -g
+endif
 
 #extra flags for maya 2016
 ifeq ($(mayaVersion),2016)
@@ -31,6 +35,7 @@ TARGET= deltaMush.so
 OBJS = deltaMush.o pluginMain.o 
 
 all : $(OBJS) 
+	echo $(BUILD)
 	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation -ltbb
 %.o: %.cpp
 	$(CXX) $(C++FLAGS) $(INCLUDES) -c $< -o $@ 

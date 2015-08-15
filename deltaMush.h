@@ -9,7 +9,7 @@
 #include <maya/MFloatArray.h>
 
 #include <tbb/task_scheduler_init.h>
-
+#include <tbb/blocked_range.h>
 #ifndef _DeltaMush
 #define _DeltaMush
 
@@ -71,6 +71,38 @@ private :
     bool initialized;
 
 };
+class Average_tbb
+{
+public:
+    /**
+    @brief this is the constructor
+    @param source: pointer to the source buffer
+    @param target: pointer to the targetr buffer
+    @param width: the width of the image
+    @param height: the height of the image
+    */
+	Average_tbb(MPointArray& source ,
+					   MPointArray& target , int iter,
+					   double amountV, std::vector<int>& neigh_table);
+
+    /**
+    @brief the () operator called by TBB
+    @param r: the range the thread had to work on
+    */
+	void operator() (const tbb::blocked_range<size_t>& r)const;
+
+
+private:
+    MPointArray& source;
+    MPointArray& target;
+    MPointArray& tmp;
+    int iter;
+    double amountV;
+    std::vector<int>& neigh_table;
+
+};
+
+
 #endif
 
 
