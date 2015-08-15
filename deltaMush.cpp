@@ -253,13 +253,12 @@ Tangent_tbb::Tangent_tbb(MPointArray * source ,
 
 void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 {
-    int i,n,ne,counter;
+    int i,n,ne;
     MVector delta,v1,v2,cross;
     MMatrix mat;
     for (i = r.begin() ; i <r.end();i++)
     {
         delta = MVector(0,0,0);
-        counter =0;
         for (n = 0; n< DeltaMush::MAX_NEIGH -1 ;n++)
         {
             ne = i*DeltaMush::MAX_NEIGH + n; 
@@ -294,11 +293,10 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                 mat[3][3] = 1;
 
                 delta += (  delta_table[ne]* mat );
-                counter++;
             //}
         }
 
-        delta= (delta/float(counter))*applyDeltaV*globalScaleV; 
+        delta= (delta/DeltaMush::MAX_NEIGH)*applyDeltaV*globalScaleV; 
         delta = ((*source)[i]+delta) - (*original)[i];
         (*original)[i]= (*original)[i] + (delta * wgts[i] * envelopeV);
     }

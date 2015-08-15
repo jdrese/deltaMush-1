@@ -19,7 +19,7 @@ endif
 
 #defining source directory
 SRCDIR=.
-C++FLAGS += -funroll-loops
+C++FLAGS += -funroll-loops -msse4
 BUILD := release
 ifeq ($(BUILD),debug)
 C++FLAGS += -g
