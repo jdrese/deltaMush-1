@@ -41,7 +41,7 @@ TARGET= deltaMush.so
 OBJS = deltaMush.o pluginMain.o deltaMushKernel.cu.o
 
 all : $(OBJS) 
-	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation -ltbb	
+	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) $(CUDA_LIB_PATH) -lOpenMaya -lOpenMayaAnim -lFoundation $(CUDA_LIB)
 %.o: %.cpp
 	$(CXX) $(C++FLAGS) $(INCLUDES) -c $< -o $@ 
 %.cu.o: %.cu

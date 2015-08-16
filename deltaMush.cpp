@@ -22,10 +22,12 @@
 
 //cuda calls 
 #if COMPUTE==1
+
 float * allocate_buffer(int size, int stride);
 void kernel_tear_down(float * d_in_buffer, float * d_out_buffer);
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
-                    float * d_in_buffer, float * d_out_buffer, const int size,float amount);
+                   float * d_in_buffer, float * d_out_buffer, const int size,float amount);
+
 #endif
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const unsigned int DeltaMush::MAX_NEIGH =4;
@@ -62,7 +64,10 @@ MObject DeltaMush::globalScale;
 //DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
 DeltaMush::DeltaMush():initialized(false), init(4)
 {
-	targetPos.setLength(0);
+    #if COMPUTE==1
+    h_out_buffer = nullptr;
+    #endif
+    targetPos.setLength(0);
 }
 
 //creator funtion
@@ -210,10 +215,15 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
     #else
+    
+    int i=0;
+    
     //CUDA
+    
     MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
     inMeshH.jumpToArrayElement( 0 ) ;
     MObject inMesh= inMeshH.inputValue().child( inputGeom ).asMesh() ;
+    std::cout<<"null ? :"<<inMesh.isNull()<<std::endl;
     MFnMesh meshFn(inMesh) ;
 
     //float am = data.inputValue(amount).asFloat();
@@ -221,8 +231,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
     MStatus stat;
     const float * v_data = meshFn.getRawPoints(&stat);
-    const int size = MItGeometry(inMesh).exactCount(); 
-
+    std::cout<<"stat "<< stat<<std::endl;
+    const int size = iter.exactCount(); 
+    
     
     if(!m_cuda_setup)
     {
@@ -231,16 +242,15 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         h_out_buffer = new float[4*size]; 
         m_cuda_setup= true;
     }
+        
+    average_launcher(v_data, h_out_buffer, d_in_buffer, d_out_buffer, size, am);
     
-    //average_launcher(v_data, h_out_buffer, d_in_buffer, d_out_buffer, size, am);
-    
-    
-    /*
     MPointArray outp;
     outp.setLength(size);
+    std::cout<<"size "<<size<<std::endl;
 
 
-
+    
     MPoint tmp;
     int c=0; 
     for (int i=0; i<size*4;i+=4,c++)
@@ -248,9 +258,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
         outp[c] =tmp ;
     }
-
+    std::cout<<outp.length()<<std::endl; 
     iter.setAllPositions(outp);
-*/
+    
+    m_cuda_setup = true;
     #endif
     
     return MStatus::kSuccess ; 
@@ -260,7 +271,10 @@ DeltaMush::~DeltaMush()
 {
     #if COMPUTE==1
     kernel_tear_down(d_in_buffer, d_out_buffer);
-    delete(h_out_buffer);
+    if(h_out_buffer)
+    {
+        delete(h_out_buffer);
+    }
     #endif
 }
 
