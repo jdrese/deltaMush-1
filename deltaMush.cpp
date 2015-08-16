@@ -23,12 +23,15 @@
 //cuda calls 
 #if COMPUTE==1
 
-float * allocate_buffer(int size, int stride);
+float * allocate_bufferFloat(int size, int stride);
+int * allocate_bufferInt(int size, int stride);
 void kernel_tear_down(float * d_in_buffer, float * d_out_buffer);
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
-                   float * d_in_buffer, float * d_out_buffer, const int size,float amount);
-
+                   float * d_in_buffer, float * d_out_buffer, 
+                   int * h_neighbours, int * d_neighbours,
+                   const int size,int iterationsV);
 #endif
+
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const unsigned int DeltaMush::MAX_NEIGH =4;
 
@@ -66,6 +69,7 @@ DeltaMush::DeltaMush():initialized(false), init(4)
 {
     #if COMPUTE==1
     h_out_buffer = nullptr;
+    m_cuda_setup =false;
     #endif
     targetPos.setLength(0);
 }
@@ -147,12 +151,12 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 						unsigned int mIndex )
 {	
 	
+	double envelopeV = data.inputValue(envelope).asFloat();
+	int iterationsV = data.inputValue(iterations).asInt();
 	
     #if COMPUTE==0
     //Preliminary check :
 	//Check if the ref mesh is connected
-	double envelopeV = data.inputValue(envelope).asFloat();
-	int iterationsV = data.inputValue(iterations).asInt();
 	
     MPlug refMeshPlug( thisMObject(), referenceMesh );
     if (envelopeV > SMALL && iterationsV > 0 && refMeshPlug.isConnected() ) 
@@ -216,52 +220,78 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
     #else
     
-    int i=0;
-    
-    //CUDA
-    
-    MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
-    inMeshH.jumpToArrayElement( 0 ) ;
-    MObject inMesh= inMeshH.inputValue().child( inputGeom ).asMesh() ;
-    std::cout<<"null ? :"<<inMesh.isNull()<<std::endl;
-    MFnMesh meshFn(inMesh) ;
-
-    //float am = data.inputValue(amount).asFloat();
-    float am = data.inputValue(amount).asDouble();
-
-    MStatus stat;
-    const float * v_data = meshFn.getRawPoints(&stat);
-    std::cout<<"stat "<< stat<<std::endl;
-    const int size = iter.exactCount(); 
-    
-    
-    if(!m_cuda_setup)
+    MPlug refMeshPlug( thisMObject(), referenceMesh );
+    if (envelopeV > SMALL && iterationsV > 0 && refMeshPlug.isConnected() ) 
     {
-        d_in_buffer = allocate_buffer(size,3);
-        d_out_buffer = allocate_buffer(size,4);
-        h_out_buffer = new float[4*size]; 
-        m_cuda_setup= true;
-    }
-        
-    average_launcher(v_data, h_out_buffer, d_in_buffer, d_out_buffer, size, am);
-    
-    MPointArray outp;
-    outp.setLength(size);
-    std::cout<<"size "<<size<<std::endl;
+        int i=0;
+
+        //CUDA
+
+        MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
+        inMeshH.jumpToArrayElement( 0 ) ;
+        MObject inMesh= inMeshH.inputValue().child( inputGeom ).asMesh() ;
+        MFnMesh meshFn(inMesh) ;
+
+        //float am = data.inputValue(amount).asFloat();
+        float am = data.inputValue(amount).asDouble();
+
+        MStatus stat;
+        const float * v_data = meshFn.getRawPoints(&stat);
+        const int size = iter.exactCount(); 
+        double applyDeltaV = data.inputValue(applyDelta).asDouble();
+        double amountV = data.inputValue(amount).asDouble();
+        bool rebindV = data.inputValue(rebind).asBool();
+        double globalScaleV = data.inputValue( globalScale).asDouble();
+        if (initialized == false || rebindV == true)
+        {
+            MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
+            pos.setLength(size);	
+            targetPos.setLength(size);
+            neigh_table.resize(size *MAX_NEIGH);
+            delta_table.resize(size *MAX_NEIGH);
+            delta_size.resize(size );
+            rebindData(referenceMeshV, iterationsV,amountV);
 
 
-    
-    MPoint tmp;
-    int c=0; 
-    for (int i=0; i<size*4;i+=4,c++)
-    {
-        tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
-        outp[c] =tmp ;
+            //read weights
+            getWeights(data,size);
+            initialized = true;
+        }
+
+
+        if(!m_cuda_setup)
+        {
+            std::cout<<"setting cuda stuff"<<std::endl;
+            d_in_buffer = allocate_bufferFloat(size,3);
+            d_out_buffer = allocate_bufferFloat(size,4);
+            d_neighbours= allocate_bufferInt(size,MAX_NEIGH);
+            h_out_buffer = new float[4*size]; 
+            m_cuda_setup= true;
+        }
+
+        average_launcher(v_data, h_out_buffer, 
+                d_in_buffer, d_out_buffer, 
+                neigh_table.data(), d_neighbours,
+                size, iterationsV);
+
+        MPointArray outp;
+        outp.setLength(size);
+        std::cout<<"size "<<size<<std::endl;
+        //std::cout<<"size "<<(*neigh_table.data())<<std::endl;
+
+
+
+        MPoint tmp;
+        int c=0; 
+        for (int i=0; i<size*4;i+=4,c++)
+        {
+            tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
+            outp[c] =tmp ;
+        }
+        std::cout<<outp.length()<<std::endl; 
+        iter.setAllPositions(outp);
+
     }
-    std::cout<<outp.length()<<std::endl; 
-    iter.setAllPositions(outp);
-    
-    m_cuda_setup = true;
     #endif
     
     return MStatus::kSuccess ; 

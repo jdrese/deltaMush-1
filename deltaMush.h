@@ -75,6 +75,7 @@ private :
     float * h_out_buffer;
     float * d_out_buffer;
     float * d_in_buffer;
+    int* d_neighbours;
 
 
 };

@@ -95,7 +95,7 @@ DEVKIT_INCLUDE        = $(MAYA_LOCATION)/include
 DEVKIT_ALEMBIC_INCDIR = $(DEVKIT)/Alembic/include
 DEVKIT_ALEMBIC_LIBDIR = $(DEVKIT)/Alembic/lib
 
-INCLUDES	= -I . -I$(DEVKIT_INCLUDE) -I/usr/X11R6/include
+INCLUDES	= -I . -isystem$(DEVKIT_INCLUDE) -I/usr/X11R6/include
 
 # -Bsymbolic binds references to global symbols within the library.
 # This avoids symbol clashes in other shared libraries but forces

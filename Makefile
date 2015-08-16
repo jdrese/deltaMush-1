@@ -27,8 +27,8 @@ C++FLAGS += -g
 endif
 COMPUTE := 1 
 #adding custom flags
-C++FLAGS += -funroll-loops -msse4 -DMaya$(mayaVersion) -DCOMPUTE=$(COMPUTE)
-
+C++FLAGS +=  -funroll-loops -msse4 -DMaya$(mayaVersion) -DCOMPUTE=$(COMPUTE)
+#-Wconversion
 #extra flags for maya 2016
 ifeq ($(mayaVersion),2016)
 C++FLAGS += -ftemplate-depth=50 -std=c++11 
