@@ -15,9 +15,9 @@
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MArrayDataBuilder.h>
 #include <maya/MFnFloatArrayData.h>
+
 #include <tbb/parallel_for.h>
-#include <Eigen/Dense>
-#include <Eigen/LU>
+
 #define SMALL (float)1e-6
 
 
@@ -302,47 +302,6 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 
 }
 
-void DeltaMush::averageRelax( MPointArray& source ,
-					   MPointArray& target , int iter,
-					   double amountV)
-{
-    int size = source.length();
-	copy.copy(source);
-    
-    //initializing references
-    MPointArray &srcR = copy;
-    MPointArray &trgR= target;
-    MPointArray &tmp = copy;	
-    
-    MVector temp;
-	int i , n , it;
-    int counter =0;
-    int ne =0; 
-    for (it = 0; it < iter ; it++)
-	{
-		for (i = 0 ; i < size ; i++)
-		{
-			temp = MVector(0,0,0);
-			counter = 0;
-            for (n = 0; n<MAX_NEIGH; n++)
-			{
-                ne = neigh_table[(i*MAX_NEIGH) + n];
-                //need to work on this if, find a way to remove it
-                //if (ne!= -1)
-                //{
-                    temp += srcR[ne];					
-                    counter +=1;
-                //}
-			}
-			temp/= float(counter);
-			trgR[i] =srcR[i] +  (temp - srcR[i] )*amountV;
-		}
-        tmp=srcR;
-        srcR = trgR;
-        trgR = tmp;
-    }
-     
-}
 void DeltaMush::initData(
     			 MObject &mesh,
     			 int iters)
@@ -485,14 +444,26 @@ void DeltaMush::rebindData(		MObject &mesh,
 								)
 {
 	initData(mesh , iter);
-	MPointArray posRev,back;
+	MPointArray posRev,back,original;
 	MFnMesh meshFn(mesh);
-	meshFn.getPoints(posRev, MSpace::kObject);
-	back.copy(posRev);
-	averageRelax(posRev , back, iter, amount);
-	computeDelta(posRev ,back);
+	//building all the arrays
+    meshFn.getPoints(posRev, MSpace::kObject);
+    back.copy(posRev);
+    original.copy(posRev);
+    
+    //getting ready to kick the parallel kernel 
+    int size = posRev.length();
+    MPointArray * srcR = &back;
+    MPointArray * trgR= &posRev;
+    int it =0;
+    for (it = 0; it < iter; it++)
+    {
+        swap(srcR, trgR);
+        Average_tbb kernel(srcR, trgR, iter, amount, neigh_table);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
+    }
+	computeDelta(original,(*trgR));
 }
-
 MStatus DeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray )
 {
     MStatus status;
@@ -502,7 +473,25 @@ MStatus DeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray 
 	}
     return MS::kSuccess;
 }
+
+#ifdef Maya2016
 DeltaMush::SchedulingType DeltaMush::schedulingType()const
 {
     return SchedulingType::kParallel;
 }
+
+MStatus DeltaMush::preEvaluation( const  MDGContext& context, const MEvaluationNode& evaluationNode )
+{
+    
+    MStatus status;
+    if( ( evaluationNode.dirtyPlugExists(iterations, &status) && status ) ||  
+            ( evaluationNode.dirtyPlugExists(amount, &status) && status ) )
+    {
+        initialized=0;
+    }
+    return MS::kSuccess;
+
+
+}
+
+#endif

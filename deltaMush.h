@@ -7,7 +7,7 @@
 #include <vector>
 #include <maya/MGlobal.h>
 #include <maya/MFloatArray.h>
-
+#include <maya/MEvaluationNode.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/blocked_range.h>
 #ifndef _DeltaMush
@@ -30,11 +30,6 @@ private:
 
     void initData( MObject &mesh,
     				int iters );
-	
-	void averageRelax( MPointArray& source ,
-					   MPointArray& target,
-					   int iter,
-					   double amountV);
 
 	void computeDelta ( MPointArray& source ,
 					   MPointArray& target);
@@ -44,8 +39,10 @@ private:
 						double amount
 					);
     void getWeights(MDataBlock data, int size);
+    #ifdef Maya2016
     virtual SchedulingType schedulingType()const;
-
+    virtual MStatus     preEvaluation( const  MDGContext& context, const MEvaluationNode& evaluationNode );
+    #endif
 public :
 	static MTypeId		id;	
 	static MObject		referenceMesh;
