@@ -25,9 +25,9 @@ BUILD := release
 ifeq ($(BUILD),debug)
 C++FLAGS += -g
 endif
-
+COMPUTE := 1 
 #adding custom flags
-C++FLAGS += -funroll-loops -msse4 -DMaya$(mayaVersion)
+C++FLAGS += -funroll-loops -msse4 -DMaya$(mayaVersion) -DCOMPUTE=$(COMPUTE)
 
 #extra flags for maya 2016
 ifeq ($(mayaVersion),2016)
@@ -38,10 +38,9 @@ endif
 
 #compiling object and targets
 TARGET= deltaMush.so
-OBJS = deltaMush.o pluginMain.o 
+OBJS = deltaMush.o pluginMain.o deltaMushKernel.cu.o
 
 all : $(OBJS) 
-	echo $(BUILD)
 	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation -ltbb
 %.o: %.cpp
 	$(CXX) $(C++FLAGS) $(INCLUDES) -c $< -o $@ 

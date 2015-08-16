@@ -20,8 +20,10 @@
 
 #define SMALL (float)1e-6
 
-
-
+#if COMPUTE==1
+//cuda calls 
+float * allocate_buffer(int size, int stride);
+#endif
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const unsigned int DeltaMush::MAX_NEIGH =4;
 
@@ -137,7 +139,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 						unsigned int mIndex )
 {	
 	
-	//Preliminary check :
+	
+    #if COMPUTE==0
+    //Preliminary check :
 	//Check if the ref mesh is connected
 	double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
@@ -202,7 +206,35 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         }
 
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
+    #else
 
+    MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
+    inMeshH.jumpToArrayElement( 0 ) ;
+    MObject inMesh= inMeshH.inputValue().child( inputGeom ).asMesh() ;
+    MFnMesh meshFn(inMesh) ;
+
+    float am = data.inputValue(amount).asFloat();
+
+    MStatus stat;
+    const float * v_data = meshFn.getRawPoints(&stat);
+    const int size = MItGeometry(inMesh).exactCount(); 
+
+    if(!m_cuda_setup)
+    {
+        d_in_buffer = allocate_buffer(size,3);
+        d_out_buffer = allocate_buffer(size,4);
+        h_out_buffer = new float[4*size]; 
+        m_cuda_setup= true;
+    }
+    /*
+    MPointArray outp;
+    outp.setLength(size);
+    MFloatPointArray outpf;
+    outpf.setLength(size);
+    */ 
+
+
+    #endif
     return MStatus::kSuccess ; 
 }
 

@@ -39,10 +39,13 @@ private:
 						double amount
 					);
     void getWeights(MDataBlock data, int size);
+
     #ifdef Maya2016
     virtual SchedulingType schedulingType()const;
     virtual MStatus     preEvaluation( const  MDGContext& context, const MEvaluationNode& evaluationNode );
     #endif
+
+
 public :
 	static MTypeId		id;	
 	static MObject		referenceMesh;
@@ -65,8 +68,13 @@ private :
     std::vector<MVector> delta_table;
     std::vector<float> delta_size;
     tbb::task_scheduler_init init;
-	
     bool initialized;
+    //cuda stuff
+    bool m_cuda_setup;
+    float * h_out_buffer;
+    float * d_out_buffer;
+    float * d_in_buffer;
+
 
 };
 struct Average_tbb
