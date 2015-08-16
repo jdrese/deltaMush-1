@@ -410,6 +410,7 @@ void DeltaMush::getWeights(MDataBlock data, int size)
     MArrayDataHandle inWeightH = data.inputArrayValue(weightList);
     int c = inWeightH.elementCount(); 
     wgts.resize(size);
+    //if there is no map we initialize it to 1.0
     if (c>0)
     { 
        MStatus stat = inWeightH.jumpToElement(0);
@@ -434,8 +435,6 @@ void DeltaMush::getWeights(MDataBlock data, int size)
 
        }
     }
-
-       
        
 }
 void DeltaMush::rebindData(		MObject &mesh,
@@ -464,6 +463,7 @@ void DeltaMush::rebindData(		MObject &mesh,
     }
 	computeDelta(original,(*trgR));
 }
+
 MStatus DeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray )
 {
     MStatus status;
@@ -482,7 +482,6 @@ DeltaMush::SchedulingType DeltaMush::schedulingType()const
 
 MStatus DeltaMush::preEvaluation( const  MDGContext& context, const MEvaluationNode& evaluationNode )
 {
-    
     MStatus status;
     if( ( evaluationNode.dirtyPlugExists(iterations, &status) && status ) ||  
             ( evaluationNode.dirtyPlugExists(amount, &status) && status ) )
