@@ -12,26 +12,31 @@ CUDA_LIB_PATH = -L /usr/local/cuda/lib64
 NVCC = $(CUDA_PATH)/bin/nvcc
 CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
 
+#configuring other enviroment
 else ifeq ($(USER),mog)
 include buildconfig
 TOP= $(MAYA_LOCATION)/devkit/plug-ins
 endif
 
-#defining source directory
+#defining source directory needed by build config
 SRCDIR=.
-C++FLAGS += -funroll-loops -msse4
+
 BUILD := release
 ifeq ($(BUILD),debug)
 C++FLAGS += -g
 endif
 
+#adding custom flags
+C++FLAGS += -funroll-loops -msse4 -DMaya$(mayaVersion)
+
 #extra flags for maya 2016
 ifeq ($(mayaVersion),2016)
 C++FLAGS += -ftemplate-depth=50 -std=c++11 
 endif
+
 .SUFFIXES: .cpp .o .cu .h
 
-#what I want to compile
+#compiling object and targets
 TARGET= deltaMush.so
 OBJS = deltaMush.o pluginMain.o 
 

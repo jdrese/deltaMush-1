@@ -44,7 +44,7 @@ private:
 						double amount
 					);
     void getWeights(MDataBlock data, int size);
-
+    virtual SchedulingType schedulingType()const;
 
 public :
 	static MTypeId		id;	
@@ -66,6 +66,7 @@ private :
     std::vector<float> wgts;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
+    std::vector<float> delta_size;
     tbb::task_scheduler_init init;
 	
     bool initialized;
@@ -99,6 +100,7 @@ struct Tangent_tbb
                 const double globalScaleV,
                 const double envelopeV,
                 const std::vector<float> & wgts,
+                const std::vector<float>& delta_size,
                 const std::vector<MVector>& delta_table,
                 const std::vector<int>& neigh_table);
 
@@ -111,6 +113,7 @@ struct Tangent_tbb
         const double envelopeV;
         const double globalScaleV;
         const std::vector<float> & wgts;
+        const std::vector<float> & delta_size;
         const std::vector<MVector> &delta_table;
         const std::vector<int>& neigh_table;
 

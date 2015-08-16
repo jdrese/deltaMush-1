@@ -159,6 +159,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             targetPos.setLength(size);
             neigh_table.resize(size *MAX_NEIGH);
             delta_table.resize(size *MAX_NEIGH);
+            delta_size.resize(size );
             rebindData(referenceMeshV, iterationsV,amountV);
 
 
@@ -189,7 +190,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         if (applyDeltaV >= SMALL )
         {
             Tangent_tbb kernelT (trgR,&pos, applyDeltaV, globalScaleV, envelopeV,
-                            wgts, delta_table, neigh_table);
+                            wgts, delta_size, delta_table, neigh_table);
             tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernelT);
 
             iter.setAllPositions(pos);
@@ -239,10 +240,11 @@ Tangent_tbb::Tangent_tbb(MPointArray * source ,
                 const double envelopeV,
                 const double globalScaleV,
                 const std::vector<float> & wgts,
+                const std::vector<float> & delta_size,
                 const std::vector<MVector> & delta_table,
                 const std::vector<int>& neigh_table): source(source), original(original),
                                                         applyDeltaV(applyDeltaV),envelopeV(envelopeV),
-                                                      globalScaleV(globalScaleV), wgts(wgts),
+                                                      globalScaleV(globalScaleV), wgts(wgts), delta_size(delta_size),
                                                       delta_table(delta_table), neigh_table(neigh_table)
 {}
 
@@ -291,7 +293,8 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
             //}
         }
 
-        delta= (delta/DeltaMush::MAX_NEIGH)*applyDeltaV*globalScaleV; 
+        //delta= (delta/DeltaMush::MAX_NEIGH)*applyDeltaV*globalScaleV; 
+        delta= delta.normal()*delta_size[i]*applyDeltaV*globalScaleV; 
         delta = ((*source)[i]+delta) - (*original)[i];
         (*original)[i]= (*original)[i] + (delta * wgts[i] * envelopeV);
     }
@@ -401,8 +404,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 	{
 		
 		delta = MVector ( source[i] - target[i] );
-
-		//dataPoints[i].deltaLen = delta.length();
+		delta_size[i] = delta.length();
 		//get tangent matrices
 		for (n = 0; n<MAX_NEIGH-1; n++)
 		{
@@ -500,4 +502,7 @@ MStatus DeltaMush::setDependentsDirty( const MPlug& plug, MPlugArray& plugArray 
 	}
     return MS::kSuccess;
 }
-
+DeltaMush::SchedulingType DeltaMush::schedulingType()const
+{
+    return SchedulingType::kParallel;
+}
