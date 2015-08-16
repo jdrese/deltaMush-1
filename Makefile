@@ -4,7 +4,7 @@ ifeq ($(USER), giordi)
 include buildconfig_home
 LFAGS += -L /home/giordi/WORK_IN_PROGRESS/C/libs
 TOP= /usr/autodesk/maya2016/devkit/plug-ins
-INCLUDES += -isystem /home/giordi/WORK_IN_PROGRESS/C/libs/eigen
+#INCLUDES += -isystem /home/giordi/WORK_IN_PROGRESS/C/libs/eigen
 
 CUDA_LIB = -lcudart -lcudadevrt
 CUDA_PATH = "/usr/local/cuda-6.5"
@@ -41,7 +41,7 @@ TARGET= deltaMush.so
 OBJS = deltaMush.o pluginMain.o deltaMushKernel.cu.o
 
 all : $(OBJS) 
-	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation -ltbb
+	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation -ltbb	
 %.o: %.cpp
 	$(CXX) $(C++FLAGS) $(INCLUDES) -c $< -o $@ 
 %.cu.o: %.cu

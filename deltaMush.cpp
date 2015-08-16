@@ -20,9 +20,12 @@
 
 #define SMALL (float)1e-6
 
-#if COMPUTE==1
 //cuda calls 
+#if COMPUTE==1
 float * allocate_buffer(int size, int stride);
+void kernel_tear_down(float * d_in_buffer, float * d_out_buffer);
+void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
+                    float * d_in_buffer, float * d_out_buffer, const int size,float amount);
 #endif
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const unsigned int DeltaMush::MAX_NEIGH =4;
@@ -207,18 +210,20 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
     #else
-
+    //CUDA
     MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
     inMeshH.jumpToArrayElement( 0 ) ;
     MObject inMesh= inMeshH.inputValue().child( inputGeom ).asMesh() ;
     MFnMesh meshFn(inMesh) ;
 
-    float am = data.inputValue(amount).asFloat();
+    //float am = data.inputValue(amount).asFloat();
+    float am = data.inputValue(amount).asDouble();
 
     MStatus stat;
     const float * v_data = meshFn.getRawPoints(&stat);
     const int size = MItGeometry(inMesh).exactCount(); 
 
+    
     if(!m_cuda_setup)
     {
         d_in_buffer = allocate_buffer(size,3);
@@ -226,17 +231,39 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         h_out_buffer = new float[4*size]; 
         m_cuda_setup= true;
     }
+    
+    //average_launcher(v_data, h_out_buffer, d_in_buffer, d_out_buffer, size, am);
+    
+    
     /*
     MPointArray outp;
     outp.setLength(size);
-    MFloatPointArray outpf;
-    outpf.setLength(size);
-    */ 
 
 
+
+    MPoint tmp;
+    int c=0; 
+    for (int i=0; i<size*4;i+=4,c++)
+    {
+        tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
+        outp[c] =tmp ;
+    }
+
+    iter.setAllPositions(outp);
+*/
     #endif
+    
     return MStatus::kSuccess ; 
 }
+
+DeltaMush::~DeltaMush()
+{
+    #if COMPUTE==1
+    kernel_tear_down(d_in_buffer, d_out_buffer);
+    delete(h_out_buffer);
+    #endif
+}
+
 
 Average_tbb::Average_tbb(MPointArray * source ,
 					   MPointArray * target , int iter,

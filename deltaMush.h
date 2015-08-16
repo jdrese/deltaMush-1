@@ -21,6 +21,7 @@ class DeltaMush : public MPxDeformerNode
 {
 public:
 	DeltaMush();
+    ~DeltaMush();
 	static  void*		creator();
 	static  MStatus		initialize();
 	virtual MStatus		deform(MDataBlock& data, MItGeometry& iter, const MMatrix& mat, unsigned int mIndex);
