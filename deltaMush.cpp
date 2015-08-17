@@ -25,7 +25,7 @@
 
 float * allocate_bufferFloat(int size, int stride);
 int * allocate_bufferInt(int size, int stride);
-void kernel_tear_down(float * d_in_buffer, float * d_out_buffer);
+void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * neigh_table);
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
                    float * d_in_buffer, float * d_out_buffer, 
                    int * h_neighbours, int * d_neighbours,
@@ -297,7 +297,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 DeltaMush::~DeltaMush()
 {
     #if COMPUTE==1
-    kernel_tear_down(d_in_buffer, d_out_buffer);
+    kernel_tear_down(d_in_buffer, d_out_buffer, d_neighbours);
     if(h_out_buffer)
     {
         delete(h_out_buffer);
