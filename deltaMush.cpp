@@ -276,8 +276,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         MPointArray outp;
         outp.setLength(size);
-        std::cout<<"size "<<size<<std::endl;
-        //std::cout<<"size "<<(*neigh_table.data())<<std::endl;
 
 
 
@@ -288,7 +286,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
             outp[c] =tmp ;
         }
-        std::cout<<outp.length()<<std::endl; 
         iter.setAllPositions(outp);
 
     }

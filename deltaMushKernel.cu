@@ -103,9 +103,18 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     size_t width_blocks = ((size%grain_size) != 0)?(size/grain_size) +1: (size/grain_size); 
     dim3 block_size(grain_size,1,1);
     dim3 grid_size(width_blocks,1,1);
-
-    push_kernel<<<grid_size, block_size>>>(d_in_buffer, d_out_buffer, d_neighbours, size, iter);
-    //cudaDeviceSynchronize();
+    
+    float * src= d_in_buffer;
+    float * trg = d_out_buffer; 
+    float * tmp;
+    for (int i =0; i<iter; i++)
+    {
+        push_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size, iter);
+        tmp = src;
+       src = trg;
+      trg =tmp; 
+    }
+        //cudaDeviceSynchronize();
     //copy data back
     s = cudaMemcpy(h_out_buffer, d_out_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
     if (s != cudaSuccess) 
