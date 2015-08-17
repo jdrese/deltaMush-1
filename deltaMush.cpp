@@ -25,10 +25,11 @@
 
 float * allocate_bufferFloat(int size, int stride);
 int * allocate_bufferInt(int size, int stride);
-void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * neigh_table);
+void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_table, float * d_delta_table);
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
                    float * d_in_buffer, float * d_out_buffer, 
                    int * h_neighbours, int * d_neighbours,
+                   float * h_delta_table, float * d_delta_table,
                    const int size,int iterationsV);
 #endif
 
@@ -249,6 +250,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             targetPos.setLength(size);
             neigh_table.resize(size *MAX_NEIGH);
             delta_table.resize(size *MAX_NEIGH);
+            //this one is a flat array of floats, means we are gonna
+            //store 12 floats for each vertex
+            gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
+
             delta_size.resize(size );
             rebindData(referenceMeshV, iterationsV,amountV);
 
@@ -265,6 +270,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             d_in_buffer = allocate_bufferFloat(size,3);
             d_out_buffer = allocate_bufferFloat(size,3);
             d_neighbours= allocate_bufferInt(size,MAX_NEIGH);
+            d_delta_table= allocate_bufferFloat(size,9);
             h_out_buffer = new float[3*size]; 
             m_cuda_setup= true;
         }
@@ -272,12 +278,12 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         average_launcher(v_data, h_out_buffer, 
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
+                gpu_delta_table.data(), d_delta_table,
                 size, iterationsV);
+
 
         MPointArray outp;
         outp.setLength(size);
-
-
 
         MPoint tmp;
         int c=0; 
@@ -297,7 +303,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 DeltaMush::~DeltaMush()
 {
     #if COMPUTE==1
-    kernel_tear_down(d_in_buffer, d_out_buffer, d_neighbours);
+    kernel_tear_down(d_in_buffer, d_out_buffer, d_neighbours, d_delta_table);
     if(h_out_buffer)
     {
         delete(h_out_buffer);
@@ -456,7 +462,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 	int size = source.length();
 	MVectorArray arr;
 	MVector delta , v1 , v2 , cross;
-	int i , n,ne ;
+	int i , n,ne,gpu_id ;
 	MMatrix mat;
 	//build the matrix
 	for ( i = 0 ; i < size ; i++)
@@ -465,41 +471,44 @@ void DeltaMush::computeDelta(MPointArray& source ,
 		delta = MVector ( source[i] - target[i] );
 		delta_size[i] = delta.length();
 		//get tangent matrices
-		for (n = 0; n<MAX_NEIGH-1; n++)
-		{
-                    ne = i*MAX_NEIGH + n; 
-                    
-                    if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
-                    {
-			v1 = target[ neigh_table[ne] ] - target[i] ;
-			v2 = target[ neigh_table[ne+1] ] - target[i] ;
-					 
-			v2.normalize();
-			v1.normalize();
+        for (n = 0; n<MAX_NEIGH-1; n++)
+        {
+            ne = i*MAX_NEIGH + n; 
 
-			cross = v1 ^ v2;
-			v2 = cross ^ v1;
+            if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
+            {
+                v1 = target[ neigh_table[ne] ] - target[i] ;
+                v2 = target[ neigh_table[ne+1] ] - target[i] ;
 
-			mat = MMatrix();
-			mat[0][0] = v1.x;
-			mat[0][1] = v1.y;
-			mat[0][2] = v1.z;
-			mat[0][3] = 0;
-			mat[1][0] = v2.x;
-			mat[1][1] = v2.y;
-			mat[1][2] = v2.z;
-			mat[1][3] = 0;
-			mat[2][0] = cross.x;
-			mat[2][1] = cross.y;
-			mat[2][2] = cross.z;
-			mat[2][3] = 0;
-			mat[3][0] = 0;
-            mat[3][1] = 0;
-            mat[3][2] = 0;
-            mat[3][3] = 1;
+                v2.normalize();
+                v1.normalize();
 
-            delta_table[ne] =  MVector( delta  * mat.inverse());
+                cross = v1 ^ v2;
+                v2 = cross ^ v1;
 
+                mat = MMatrix();
+                mat[0][0] = v1.x;
+                mat[0][1] = v1.y;
+                mat[0][2] = v1.z;
+                mat[0][3] = 0;
+                mat[1][0] = v2.x;
+                mat[1][1] = v2.y;
+                mat[1][2] = v2.z;
+                mat[1][3] = 0;
+                mat[2][0] = cross.x;
+                mat[2][1] = cross.y;
+                mat[2][2] = cross.z;
+                mat[2][3] = 0;
+                mat[3][0] = 0;
+                mat[3][1] = 0;
+                mat[3][2] = 0;
+                mat[3][3] = 1;
+
+                delta_table[ne] =  MVector( delta  * mat.inverse());
+                gpu_id = i*9 + n*3; 
+                gpu_delta_table[gpu_id] = delta_table[ne][0];
+                gpu_delta_table[gpu_id+1] = delta_table[ne][1];
+                gpu_delta_table[gpu_id+2] = delta_table[ne][2];
             }
         }
     }

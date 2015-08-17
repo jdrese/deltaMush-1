@@ -76,7 +76,8 @@ private :
     float * d_out_buffer;
     float * d_in_buffer;
     int* d_neighbours;
-
+    float * d_delta_table;
+    std::vector<float> gpu_delta_table;
 
 };
 struct Average_tbb

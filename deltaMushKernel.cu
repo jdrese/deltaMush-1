@@ -30,14 +30,26 @@ __global__ void average_kernel(float * d_in_buffer, float * d_out_buffer,
     }
 }
 
-__global__ void tangnet_kernel(float * d_in_buffer, float * d_out_buffer )
+__global__ void tangnet_kernel(float * d_smooth, float * d_original, float * d_delta_table)
 {
+    int s_id = ((blockDim.x * blockIdx.x) +threadIdx.x)*3;
+    float v1[3] = {0.0f,0.0f,0.0f};
+    float v2[3] = {0.0f,0.0f,0.0f};
+    float cross[3] = {0.0f,0.0f,0.0f};
+    if(s_id<(size)*3)
+    {
 
+        for (int n=0; n<3;n++)
+        {
+
+        }
+    }
 }
 
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
                    float * d_in_buffer, float * d_out_buffer, 
                    int * h_neighbours, int* d_neighbours,
+                   float * h_delta_table, float * d_delta_table,
                    const int size,int iter)
 {
     //copy the memory from cpu to gpu
@@ -47,7 +59,6 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     if (s != cudaSuccess) 
         printf("Error copying : %s\n", cudaGetErrorString(s));
     
-    //std::cout<<(*h_neighbours)[10]<<std::endl;
     s = cudaMemcpy(d_neighbours, h_neighbours, 4*size*sizeof(int), cudaMemcpyHostToDevice);
     if (s != cudaSuccess) 
         printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
@@ -68,7 +79,21 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
         trg =tmp; 
         average_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size);
     }
+
+    //copy  original data back up
+    //if i run the above thread async i might be able to kick this extra memcpy already?
+    //to do so I might need another buffer tho
+    s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+    //upload deltas 
+    s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+    tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, d_delta_table);
     
+
+
     //copy data back
     s = cudaMemcpy(h_out_buffer, d_out_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
     if (s != cudaSuccess) 
@@ -95,7 +120,7 @@ int * allocate_bufferInt(int size, int stride)
     return buffer;
 }
 
-void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * neigh_table)
+void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_table, float * d_delta_table)
 {
     if(d_in_buffer);
     {
@@ -109,9 +134,14 @@ void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * neigh_tab
         d_out_buffer=0;
     }
     
-    if(neigh_table)
+    if(d_neigh_table)
     {
-        cudaFree(d_out_buffer);
+        cudaFree(d_neigh_table);
+        d_out_buffer = 0;
+    }
+    if(d_delta_table)
+    {
+        cudaFree(d_delta_table);
         d_out_buffer = 0;
     }
 }
