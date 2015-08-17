@@ -5,26 +5,12 @@
 #include <iostream>
 #include <cstdio>
 __global__ void push_kernel(float * d_in_buffer, float * d_out_buffer, 
-                            int * d_neighbours, const int size, int iter)
+                            const int * d_neighbours, const int size)
 {
 
     int s_id = ((blockDim.x * blockIdx.x) +threadIdx.x)*3;
     int d_id =  ((blockDim.x * blockIdx.x) +threadIdx.x)*4;
-    /*
-    if (id>500 && id<600)
-    {
-        printf("%i \n",id); 
-    }
-    if (id==552)
-    {
-        printf("%f %f %f",d_in_buffer[id],d_in_buffer[id+1],d_in_buffer[id+2]);
-    }
     
-    */
-    float * src;
-    float * trg;
-    for (int it=0; it<iter; it++)
-    {}
     if(s_id<(size)*3)
     {
        
@@ -43,7 +29,6 @@ __global__ void push_kernel(float * d_in_buffer, float * d_out_buffer,
         d_out_buffer[s_id] = v[0]; 
         d_out_buffer[s_id+1] = v[1]; 
         d_out_buffer[s_id+2] = v[2]; 
-    
     }
 }
 
@@ -109,10 +94,10 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     float * tmp;
     for (int i =0; i<iter; i++)
     {
-        push_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size, iter);
+        push_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size);
         tmp = src;
-       src = trg;
-      trg =tmp; 
+        src = trg;
+        trg =tmp; 
     }
         //cudaDeviceSynchronize();
     //copy data back
