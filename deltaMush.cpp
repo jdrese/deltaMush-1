@@ -263,9 +263,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         {
             std::cout<<"setting cuda stuff"<<std::endl;
             d_in_buffer = allocate_bufferFloat(size,3);
-            d_out_buffer = allocate_bufferFloat(size,4);
+            d_out_buffer = allocate_bufferFloat(size,3);
             d_neighbours= allocate_bufferInt(size,MAX_NEIGH);
-            h_out_buffer = new float[4*size]; 
+            h_out_buffer = new float[3*size]; 
             m_cuda_setup= true;
         }
 
@@ -283,7 +283,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         MPoint tmp;
         int c=0; 
-        for (int i=0; i<size*4;i+=4,c++)
+        for (int i=0; i<size*3;i+=3,c++)
         {
             tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
             outp[c] =tmp ;

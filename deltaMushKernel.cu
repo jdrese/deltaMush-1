@@ -29,7 +29,7 @@ __global__ void push_kernel(float * d_in_buffer, float * d_out_buffer,
     {
        
         int id;
-        float v[4] = {0.0f,0.0f,0.0f,0.0f};
+        float v[3] = {0.0f,0.0f,0.0f};
         for (int i=0; i<4;i++)
         {
             id = d_neighbours[d_id+i]*3;
@@ -40,10 +40,9 @@ __global__ void push_kernel(float * d_in_buffer, float * d_out_buffer,
         v[0]/= 4.0f;
         v[1]/= 4.0f;
         v[2]/= 4.0f;
-        d_out_buffer[d_id] = v[0]; 
-        d_out_buffer[d_id+1] = v[1]; 
-        d_out_buffer[d_id+2] = v[2]; 
-        d_out_buffer[d_id+3] = 1.0f; 
+        d_out_buffer[s_id] = v[0]; 
+        d_out_buffer[s_id+1] = v[1]; 
+        d_out_buffer[s_id+2] = v[2]; 
     
     }
 }
@@ -108,7 +107,7 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     push_kernel<<<grid_size, block_size>>>(d_in_buffer, d_out_buffer, d_neighbours, size, iter);
     //cudaDeviceSynchronize();
     //copy data back
-    s = cudaMemcpy(h_out_buffer, d_out_buffer, 4*size*sizeof(float), cudaMemcpyDeviceToHost);
+    s = cudaMemcpy(h_out_buffer, d_out_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
     if (s != cudaSuccess) 
             printf("Error copying back: %s\n", cudaGetErrorString(s));
 }
