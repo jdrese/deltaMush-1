@@ -30,20 +30,59 @@ __global__ void average_kernel(float * d_in_buffer, float * d_out_buffer,
     }
 }
 
-__global__ void tangnet_kernel(float * d_smooth, float * d_original, float * d_delta_table)
+__global__ void tangnet_kernel(float * d_smooth, float * d_original, float * d_delta_table,const int * d_neighbours, const int size)
+
 {
+    //id stride 3
     int s_id = ((blockDim.x * blockIdx.x) +threadIdx.x)*3;
+    //id stride 4
+    int d_id =  ((blockDim.x * blockIdx.x) +threadIdx.x)*4;
+    
+    //local needed variables 
+    float v0[3] = {0.0f,0.0f,0.0f};
     float v1[3] = {0.0f,0.0f,0.0f};
     float v2[3] = {0.0f,0.0f,0.0f};
     float cross[3] = {0.0f,0.0f,0.0f};
+    int id;
+    
     if(s_id<(size)*3)
     {
+        //central vertex
+        v0[0] = d_smooth[s_id]; 
+        v0[1] = d_smooth[s_id]; 
+        v0[2] = d_smooth[s_id]; 
 
         for (int n=0; n<3;n++)
         {
 
+            id = d_neighbours[d_id+n]*3;
+            //first neighbour position
+            v1[0] = d_smooth[id]; 
+            v1[1] = d_smooth[id+1]; 
+            v1[2] = d_smooth[id+2]; 
+            
+            id = d_neighbours[d_id+n+1]*3;
+            //second neighbour position
+            v2[0] = d_smooth[id]; 
+            v2[1] = d_smooth[id+1]; 
+            v2[2] = d_smooth[id+2]; 
+
+            //generate proper vectors
+            v1[0] -= v0[0];
+            v1[1] -= v0[1];
+            v1[2] -= v0[2];
+            
+            v2[0] -= v0[0];
+            v2[1] -= v0[1];
+            v2[2] -= v0[2];
+            
         }
     }
+}
+
+__inline__ __device__ void vec_norm( float * vec)
+{
+
 }
 
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
@@ -90,7 +129,7 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
     if (s != cudaSuccess) 
         printf("Error copying : %s\n", cudaGetErrorString(s));
-    tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, d_delta_table);
+    tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, d_delta_table, d_neighbours,size);
     
 
 
