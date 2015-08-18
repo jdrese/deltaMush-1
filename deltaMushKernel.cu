@@ -4,6 +4,38 @@
 #include "device_launch_parameters.h"
 #include <iostream>
 #include <cstdio>
+
+
+//convert all to use float3 for consistency?
+// or float4 to maximize memory bandwith? not sure if applicable
+//check for intrinsic SSE operations
+//see if is possible to set a float3 in an array index? and set memory of 3 indeces?
+__inline__ __device__ float vec_len( float * vec)
+{
+    return sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]);
+}
+
+__inline__ __device__ void vec_norm( float * vec)
+{
+    float len = vec_len(vec);
+    vec[0] /= len;
+    vec[1] /= len;
+    vec[2] /= len;
+}
+// dot product
+inline __host__ __device__ float dot(float * a, float * b)
+{ 
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+// cross product
+inline __host__ __device__ void cross_prod(float * a, float * b,float *c )
+{ 
+    c[0] = a[1]*b[2] - a[2]*b[1];
+    c[1] = a[2]*b[0] - a[0]*b[2]; 
+    c[2] = a[0]*b[1] - a[1]*b[0]; 
+}
+
 __global__ void average_kernel(float * d_in_buffer, float * d_out_buffer, 
                             const int * d_neighbours, const int size)
 {
@@ -12,6 +44,9 @@ __global__ void average_kernel(float * d_in_buffer, float * d_out_buffer,
     
     if(s_id<(size)*3)
     {
+        
+        //good case for intrinsinc?
+        //__DEVICE_FUNCTIONS_DECL__ unsigned int __vadd4 ( unsigned int  a, unsigned int  b )
         int id;
         float v[3] = {0.0f,0.0f,0.0f};
         for (int i=0; i<4;i++)
@@ -30,7 +65,9 @@ __global__ void average_kernel(float * d_in_buffer, float * d_out_buffer,
     }
 }
 
-__global__ void tangnet_kernel(float * d_smooth, float * d_original, float * d_delta_table,const int * d_neighbours, const int size)
+__global__ void tangnet_kernel(float * d_smooth, float * d_original, 
+                                float * d_delta_table,const int * d_neighbours, 
+                                const int size)
 
 {
     //id stride 3
@@ -49,8 +86,9 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original, float * d_d
     {
         //central vertex
         v0[0] = d_smooth[s_id]; 
-        v0[1] = d_smooth[s_id]; 
-        v0[2] = d_smooth[s_id]; 
+        v0[1] = d_smooth[s_id+1]; 
+        v0[2] = d_smooth[s_id+2]; 
+
 
         for (int n=0; n<3;n++)
         {
@@ -75,14 +113,27 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original, float * d_d
             v2[0] -= v0[0];
             v2[1] -= v0[1];
             v2[2] -= v0[2];
+
+            vec_norm(&v1[0]);
+            vec_norm(&v2[0]);
+
+            cross_prod(v1,v2,cross);
+            cross_prod(cross,v1,v2);
             
+            if (s_id==100*3 && n==0)
+            {
+                //printf("%i  \n",d_neighbours[d_id+n]);
+                //printf("%i  \n",d_neighbours[d_id+n+1]);
+                //printf("%f %f %f \n",v0[0], v0[1],v0[2]);
+                printf("%f %f %f \n",v1[0], v1[1],v1[2]);
+                printf("%f %f %f \n",v2[0], v2[1],v2[2]);
+                printf("%f %f %f \n ===== \n",cross[0], cross[1],cross[2]);
+            }
+            
+
+
         }
     }
-}
-
-__inline__ __device__ void vec_norm( float * vec)
-{
-
 }
 
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 

@@ -252,6 +252,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             delta_table.resize(size *MAX_NEIGH);
             //this one is a flat array of floats, means we are gonna
             //store 12 floats for each vertex
+            
             gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
 
             delta_size.resize(size );
@@ -289,7 +290,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         int c=0; 
         for (int i=0; i<size*3;i+=3,c++)
         {
-            tmp = MPoint((float)h_out_buffer[i],(float)h_out_buffer[i+1],(float)h_out_buffer[i+2],1.0f);
+            tmp = MPoint((float)h_out_buffer[i],
+                        (float)h_out_buffer[i+1],
+                        (float)h_out_buffer[i+2],1.0f);
             outp[c] =tmp ;
         }
         iter.setAllPositions(outp);
@@ -376,6 +379,13 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 
                 cross = v1 ^ v2;
                 v2 = cross ^ v1;
+                if(i == 100 && n==0)
+                {
+                    std::cout<<v1<<std::endl;
+                    std::cout<<v2<<std::endl;
+                    std::cout<<cross<<std::endl;
+                }
+
 
                 mat = MMatrix();
                 mat[0][0] = v1.x;
@@ -505,10 +515,12 @@ void DeltaMush::computeDelta(MPointArray& source ,
                 mat[3][3] = 1;
 
                 delta_table[ne] =  MVector( delta  * mat.inverse());
+                #if COMPUTE == 1
                 gpu_id = i*9 + n*3; 
                 gpu_delta_table[gpu_id] = delta_table[ne][0];
                 gpu_delta_table[gpu_id+1] = delta_table[ne][1];
                 gpu_delta_table[gpu_id+2] = delta_table[ne][2];
+                #endif
             }
         }
     }
