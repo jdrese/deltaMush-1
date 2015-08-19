@@ -29,13 +29,14 @@ inline __device__ float dot(const float * a, const float * b)
 }
 
 // cross product
-inline __device__ void cross_prod(float * a, float * b,float *c )
+inline __device__ void cross_prod(const float * a, const float * b,float *c )
 { 
     c[0] = a[1]*b[2] - a[2]*b[1];
     c[1] = a[2]*b[0] - a[0]*b[2]; 
     c[2] = a[0]*b[1] - a[1]*b[0]; 
 }
 
+/*
 inline __device__ void mat3_vec3_mult(const float * mx ,
                                       const float * my , 
                                       const float * mz , 
@@ -47,6 +48,17 @@ inline __device__ void mat3_vec3_mult(const float * mx ,
     res[2] = dot(mz,v);
 }
 
+*/
+inline __device__ void mat3_vec3_mult(const float * mx ,
+                                      const float * my , 
+                                      const float * mz , 
+                                      const float * v , 
+                                      float *res )
+{
+    res[0] = (mx[0] * v[0]) + (my[0] *v[1]) + (mz[0] *v[2]); 
+    res[1] = (mx[1] * v[0]) + (my[1] *v[1]) + (mz[1] *v[2]); 
+    res[2] = (mx[2] * v[0]) + (my[2] *v[1]) + (mz[2] *v[2]); 
+}
 __global__ void average_kernel(float * d_in_buffer, float * d_out_buffer, 
                             const int * d_neighbours, const int size)
 {
@@ -106,7 +118,9 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
         v0[1] = d_smooth[s_id+1]; 
         v0[2] = d_smooth[s_id+2]; 
 
-
+        accum[0] =0;
+        accum[1] =0;
+        accum[2] =0;
         for (int n=0; n<3;n++)
         {
 
@@ -135,30 +149,52 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
             vec_norm(&v2[0]);
 
             cross_prod(v1,v2,cross);
-            cross_prod(cross,v1,v2);
-            /* 
+            /*
             if (s_id==100*3 && n==0)
             {
                 //printf("%i  \n",d_neighbours[d_id+n]);
                 //printf("%i  \n",d_neighbours[d_id+n+1]);
                 //printf("%f %f %f \n",v0[0], v0[1],v0[2]);
-                printf("%f %f %f \n",v1[0], v1[1],v1[2]);
-                printf("%f %f %f \n",v2[0], v2[1],v2[2]);
-                printf("%f %f %f \n ===== \n",cross[0], cross[1],cross[2]);
             }
             */
+            cross_prod(cross,v1,v2);
 
-
-            mat3_vec3_mult(&v1[0], &v2[0], &cross[0], &d_delta_table[delta_id +(n*3) ], &delta[0]);
+            mat3_vec3_mult(v1, v2, cross, &d_delta_table[delta_id +(n*3) ], delta);
+            /*
+            if (s_id==100*3 && n==0)
+            {
+               
+               float * tmp = &d_delta_table[delta_id +(n*3) ]; 
+                printf("v1 %f %f %f \n",v1[0], v1[1],v1[2]);
+                printf("v2 %f %f %f \n",v2[0], v2[1],v2[2]);
+                printf("cross %f %f %f \n ===== \n",cross[0], cross[1],cross[2]);
+                printf("delta %f %f %f \n ===== \n",tmp[0], tmp[1],tmp[2]);
+                printf("tangent delta %f %f %f \n",delta[0], delta[1],delta[2]);
+            }
+            */
             accum[0] += delta[0]; 
             accum[1] += delta[1]; 
             accum[2] += delta[2]; 
-            
+
         }
-            d_smooth[s_id] = d_smooth[s_id] + (accum[0]/3.0f); 
-            d_smooth[s_id+1] = d_smooth[s_id+1] + (accum[1]/3.0f); 
-            d_smooth[s_id+2] = d_smooth[s_id+2] + (accum[2]/3.0f); 
-    }
+        vec_norm(accum);
+        float dl =vec_len(&d_delta_table[delta_id ]); 
+        
+        d_original[s_id] = d_smooth[s_id] + (accum[0]* dl); 
+        d_original[s_id+1] = d_smooth[s_id+1] + (accum[1]*dl); 
+        d_original[s_id+2] = d_smooth[s_id+2] + (accum[2]*dl); 
+        
+        /*
+        d_original[s_id] = d_smooth[s_id] + delta[0]; 
+        d_original[s_id+1] = d_smooth[s_id+1] + delta[1]; 
+        d_original[s_id+2] = d_smooth[s_id+2] + delta[2]; 
+        */
+        /*
+        d_smooth[s_id] = d_smooth[s_id] + (accum[0]/3.0f); 
+        d_smooth[s_id+1] = d_smooth[s_id+1] + (accum[1]/3.0f); 
+        d_smooth[s_id+2] = d_smooth[s_id+2] + (accum[2]/3.0f); 
+        */
+        }
 }
 
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
@@ -210,7 +246,7 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
 
 
     //copy data back
-    s = cudaMemcpy(h_out_buffer, d_out_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
+    s = cudaMemcpy(h_out_buffer, d_in_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
     if (s != cudaSuccess) 
             printf("Error copying back: %s\n", cudaGetErrorString(s));
 }
