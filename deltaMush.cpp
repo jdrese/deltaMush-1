@@ -65,8 +65,8 @@ MObject DeltaMush::globalScale;
 //possible gpu?
 //sorting vertex based on neighbours bucket?
 
-//DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
-DeltaMush::DeltaMush():initialized(false), init(4)
+DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
+//DeltaMush::DeltaMush():initialized(false), init(20)
 {
     #if COMPUTE==1
     h_out_buffer = nullptr;
@@ -610,8 +610,5 @@ MStatus DeltaMush::preEvaluation( const  MDGContext& context, const MEvaluationN
         initialized=0;
     }
     return MS::kSuccess;
-
-
 }
-
 #endif

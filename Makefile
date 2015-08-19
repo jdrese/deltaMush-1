@@ -16,6 +16,8 @@ CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
 else ifeq ($(USER),mog)
 include buildconfig
 TOP= $(MAYA_LOCATION)/devkit/plug-ins
+#override gcc
+CXX= gcc481
 endif
 
 #defining source directory needed by build config
