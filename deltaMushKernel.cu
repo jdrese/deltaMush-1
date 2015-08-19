@@ -148,6 +148,7 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
             }
             */
 
+
             mat3_vec3_mult(&v1[0], &v2[0], &cross[0], &d_delta_table[delta_id +(n*3) ], &delta[0]);
             accum[0] += delta[0]; 
             accum[1] += delta[1]; 
