@@ -381,10 +381,12 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                 v2 = cross ^ v1;
                 if(i == 100 && n==0)
                 {
-                    std::cout<<v1<<std::endl;
-                    std::cout<<v2<<std::endl;
-                    std::cout<<cross<<std::endl;
-                }
+                    
+                    std::cout<<"v1 "<<v1<<std::endl;
+                    std::cout<<"v2 "<<v2<<std::endl;
+                    std::cout<<"cross "<<cross<<std::endl;
+                    
+                    }
 
 
                 mat = MMatrix();
@@ -406,6 +408,10 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                 mat[3][3] = 1;
 
                 delta += (  delta_table[ne]* mat );
+                if(i == 100 && n==0)
+                {
+                    std::cout<<"delta "<<(delta_table[ne]* mat )<<std::endl;
+                }
             //}
         }
 

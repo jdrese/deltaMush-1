@@ -31,9 +31,9 @@ inline __device__ float dot(const float * a, const float * b)
 // cross product
 inline __device__ void cross_prod(float * a, float * b,float *c )
 { 
-    c[0] = a[1]*b[2] - a[2]*b[1];
-    c[1] = a[2]*b[0] - a[0]*b[2]; 
-    c[2] = a[0]*b[1] - a[1]*b[0]; 
+    c[0] = (a[1]*b[2]) - (a[2]*b[1]);
+    c[1] = (a[2]*b[0]) - (a[0]*b[2]); 
+    c[2] = (a[0]*b[1]) - (a[1]*b[0]); 
 }
 
 inline __device__ void mat3_vec3_mult(const float * mx ,
@@ -134,21 +134,27 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
             vec_norm(&v1[0]);
             vec_norm(&v2[0]);
 
-            cross_prod(v1,v2,cross);
-            cross_prod(cross,v1,v2);
-            /* 
+            cross_prod(&v1[0],&v2[0],&cross[0]);
+            cross_prod(&cross[0],&v1[0],&v2[0]);
+             
             if (s_id==100*3 && n==0)
             {
                 //printf("%i  \n",d_neighbours[d_id+n]);
                 //printf("%i  \n",d_neighbours[d_id+n+1]);
                 //printf("%f %f %f \n",v0[0], v0[1],v0[2]);
-                printf("%f %f %f \n",v1[0], v1[1],v1[2]);
-                printf("%f %f %f \n",v2[0], v2[1],v2[2]);
-                printf("%f %f %f \n ===== \n",cross[0], cross[1],cross[2]);
+                printf("v1 %f %f %f \n",v1[0], v1[1],v1[2]);
+                printf("v2 %f %f %f \n",v2[0], v2[1],v2[2]);
+                printf("cross %f %f %f \n ===== \n",cross[0], cross[1],cross[2]);
             }
-            */
+            
 
             mat3_vec3_mult(&v1[0], &v2[0], &cross[0], &d_delta_table[delta_id +(n*3) ], &delta[0]);
+            if (s_id==100*3 && n==0)
+            {
+                //printf("%i  \n",d_neighbours[d_id+n]);
+                //printf("%i  \n",d_neighbours[d_id+n+1]);
+                printf("delta gpu %f %f %f \n",delta[0], delta[1],delta[2]);
+            }
             accum[0] += delta[0]; 
             accum[1] += delta[1]; 
             accum[2] += delta[2]; 
