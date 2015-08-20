@@ -30,7 +30,12 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
                    float * d_in_buffer, float * d_out_buffer, 
                    int * h_neighbours, int * d_neighbours,
                    float * h_delta_table, float * d_delta_table,
-                   const int size,int iterationsV, const float amountV);
+                   float * h_delta_lengths, float * d_delta_lenghts,
+                   const int size,int iterationsV, 
+                   const float amountV,
+                   const float globalScaleV,
+                   const float envelope,
+                   const float applyDelta);
 #endif
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
@@ -252,7 +257,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             delta_table.resize(size *MAX_NEIGH);
             //this one is a flat array of floats, means we are gonna
             //store 12 floats for each vertex
-            
             gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
 
             delta_size.resize(size );
@@ -272,6 +276,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             d_out_buffer = allocate_bufferFloat(size,3);
             d_neighbours= allocate_bufferInt(size,MAX_NEIGH);
             d_delta_table= allocate_bufferFloat(size,9);
+            d_delta_lenghts= allocate_bufferFloat(size,1);
             h_out_buffer = new float[3*size]; 
             m_cuda_setup= true;
         }
@@ -280,7 +285,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
                 gpu_delta_table.data(), d_delta_table,
-                size, iterationsV, amountV);
+                delta_size.data(), d_delta_lenghts,
+                size, iterationsV, amountV, globalScaleV, envelopeV,applyDeltaV);
 
 
         MPointArray outp;
@@ -420,7 +426,6 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
             //}
         }
 
-        //delta= (delta/DeltaMush::MAX_NEIGH)*applyDeltaV*globalScaleV; 
         delta= delta.normal()*delta_size[i]*applyDeltaV*globalScaleV; 
         delta = ((*source)[i]+delta) - (*original)[i];
         (*original)[i]= (*original)[i] + (delta * wgts[i] * envelopeV);
@@ -430,51 +435,51 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 }
 
 void DeltaMush::initData(
-    			 MObject &mesh,
-    			 int iters)
+        MObject &mesh,
+        int iters)
 {
 
-	MFnMesh meshFn(mesh);
-	int size = meshFn.numVertices();
+    MFnMesh meshFn(mesh);
+    int size = meshFn.numVertices();
 
-	MPointArray pos,res;
-	MItMeshVertex iter(mesh);
-	iter.reset();
-	meshFn.getPoints(pos , MSpace::kWorld);
-	
-	MVectorArray arr;
+    MPointArray pos,res;
+    MItMeshVertex iter(mesh);
+    iter.reset();
+    meshFn.getPoints(pos , MSpace::kWorld);
+
+    MVectorArray arr;
     MIntArray neig_tmp;
     int nsize;
-	for (int i = 0; i < size; i++,iter.next())
-	{
-		//point_data pt;
+    for (int i = 0; i < size; i++,iter.next())
+    {
+        //point_data pt;
 
-		iter.getConnectedVertices(neig_tmp);	
-		nsize = neig_tmp.length();
-		//dataPoints[i] = pt;
+        iter.getConnectedVertices(neig_tmp);	
+        nsize = neig_tmp.length();
+        //dataPoints[i] = pt;
         if (nsize>=MAX_NEIGH)
         {
-           neigh_table[i*MAX_NEIGH] = neig_tmp[0];
-           neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
-           neigh_table[(i*MAX_NEIGH)+2] = neig_tmp[2];
-           neigh_table[(i*MAX_NEIGH)+3] = neig_tmp[3];
+            neigh_table[i*MAX_NEIGH] = neig_tmp[0];
+            neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
+            neigh_table[(i*MAX_NEIGH)+2] = neig_tmp[2];
+            neigh_table[(i*MAX_NEIGH)+3] = neig_tmp[3];
         } 
         else
         {
             for (int n =0; n<MAX_NEIGH;n++)
             {
-               if(n<nsize)
-               {
+                if(n<nsize)
+                {
                     neigh_table[(i*MAX_NEIGH)+n] = neig_tmp[n];
-               } 
-               else
+                } 
+                else
                 {
                     //neigh_table[(i*MAX_NEIGH)+n] = -1;
                     neigh_table[(i*MAX_NEIGH)+n] = neigh_table[(i*MAX_NEIGH)];
                 }
             }
         }
-	}
+    }
 }
 
 void DeltaMush::computeDelta(MPointArray& source ,
