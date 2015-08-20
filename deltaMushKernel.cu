@@ -100,6 +100,7 @@ __global__ void average_kernel(float * d_in_buffer,
 __global__ void tangnet_kernel(float * d_smooth, float * d_original, 
                                 float * d_delta_table,const int * d_neighbours,
                                 float * d_delta_lenghts, 
+                                float * d_weights,
                                 const int size, const float globalScale,
                                 const float envelope, const float applyDelta)
 
@@ -172,12 +173,12 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
         accum[0] *= (d_delta_lenghts[len_id] *applyDelta* globalScale); 
         accum[1] *= (d_delta_lenghts[len_id] *applyDelta* globalScale); 
         accum[2] *= (d_delta_lenghts[len_id] *applyDelta* globalScale); 
+
+        float c = d_weights[len_id]* envelope;
         
-        d_original[s_id] = (((d_smooth[s_id] + accum[0]) - d_original[s_id])*envelope) + d_original[s_id]; 
-        d_original[s_id+1] = (((d_smooth[s_id+1] + accum[1]) - d_original[s_id+1])*envelope) + d_original[s_id+1]; 
-        d_original[s_id+2] = (((d_smooth[s_id+2] + accum[2]) - d_original[s_id+2])*envelope) + d_original[s_id+2]; 
-        //d_original[s_id+1] = d_smooth[s_id+1] + (accum[1]); 
-        //d_original[s_id+2] = d_smooth[s_id+2] + (accum[2]); 
+        d_original[s_id] = (((d_smooth[s_id] + accum[0]) - d_original[s_id])*c) + d_original[s_id]; 
+        d_original[s_id+1] = (((d_smooth[s_id+1] + accum[1]) - d_original[s_id+1])*c) + d_original[s_id+1]; 
+        d_original[s_id+2] = (((d_smooth[s_id+2] + accum[2]) - d_original[s_id+2])*c) + d_original[s_id+2]; 
         
         }
 }
@@ -187,12 +188,13 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
                    int * h_neighbours, int* d_neighbours,
                    float * h_delta_table, float * d_delta_table,
                    float * h_delta_lengths, float * d_delta_lenghts,
+                   float * h_weights, float * d_weights,
                    const int size,
                    const int iter, 
                    const float amount,
                    const float gloabalScale,
                    const float envelope,
-                    const float applyDelta)
+                   const float applyDelta)
     {
         //copy the memory from cpu to gpu
         int buffer_size = 3*size*sizeof(float);
@@ -205,7 +207,11 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
         if (s != cudaSuccess) 
             printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
         
-        s = cudaMemcpy(d_delta_lenghts, h_delta_lengths, size*sizeof(int), cudaMemcpyHostToDevice);
+        s = cudaMemcpy(d_delta_lenghts, h_delta_lengths, size*sizeof(float), cudaMemcpyHostToDevice);
+        if (s != cudaSuccess) 
+            printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
+        
+        s = cudaMemcpy(d_weights, h_weights, size*sizeof(float), cudaMemcpyHostToDevice);
         if (s != cudaSuccess) 
             printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
         
@@ -237,7 +243,8 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
         if (s != cudaSuccess) 
             printf("Error copying : %s\n", cudaGetErrorString(s));
         tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, 
-                                                  d_delta_table, d_neighbours,d_delta_lenghts,size,
+                                                  d_delta_table, d_neighbours,d_delta_lenghts,
+                                                  d_weights,size,
                                                   gloabalScale, envelope, applyDelta);
 
     //copy data back
@@ -266,7 +273,9 @@ int * allocate_bufferInt(int size, int stride)
     return buffer;
 }
 
-void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_table, float * d_delta_table)
+void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, 
+                      int * d_neigh_table, float * d_delta_table,
+                      float * d_delta_lenghts, float * d_weights)
 {
     if(d_in_buffer);
     {
@@ -288,6 +297,16 @@ void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_t
     if(d_delta_table)
     {
         cudaFree(d_delta_table);
+        d_out_buffer = 0;
+    }
+    if(d_delta_lenghts)
+    {
+        cudaFree(d_delta_lenghts);
+        d_out_buffer = 0;
+    }
+    if(d_weights)
+    {
+        cudaFree(d_weights);
         d_out_buffer = 0;
     }
 }

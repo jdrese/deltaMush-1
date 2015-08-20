@@ -25,12 +25,14 @@
 
 float * allocate_bufferFloat(int size, int stride);
 int * allocate_bufferInt(int size, int stride);
-void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_table, float * d_delta_table);
+void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_table, float * d_delta_table,
+                    float * d_delta_lenghts, float * d_weights);
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
                    float * d_in_buffer, float * d_out_buffer, 
                    int * h_neighbours, int * d_neighbours,
                    float * h_delta_table, float * d_delta_table,
                    float * h_delta_lengths, float * d_delta_lenghts,
+                   float * h_weights, float * d_weights,
                    const int size,int iterationsV, 
                    const float amountV,
                    const float globalScaleV,
@@ -277,6 +279,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             d_neighbours= allocate_bufferInt(size,MAX_NEIGH);
             d_delta_table= allocate_bufferFloat(size,9);
             d_delta_lenghts= allocate_bufferFloat(size,1);
+            d_weights= allocate_bufferFloat(size,1);
             h_out_buffer = new float[3*size]; 
             m_cuda_setup= true;
         }
@@ -286,6 +289,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                 neigh_table.data(), d_neighbours,
                 gpu_delta_table.data(), d_delta_table,
                 delta_size.data(), d_delta_lenghts,
+                wgts.data(), d_weights, 
                 size, iterationsV, amountV, globalScaleV, envelopeV,applyDeltaV);
 
 
@@ -312,7 +316,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 DeltaMush::~DeltaMush()
 {
     #if COMPUTE==1
-    kernel_tear_down(d_in_buffer, d_out_buffer, d_neighbours, d_delta_table);
+    kernel_tear_down(d_in_buffer, d_out_buffer, d_neighbours, d_delta_table, d_delta_lenghts, d_weights);
     if(h_out_buffer)
     {
         delete(h_out_buffer);

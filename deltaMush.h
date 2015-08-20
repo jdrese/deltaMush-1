@@ -78,6 +78,7 @@ private :
     int* d_neighbours;
     float * d_delta_table;
     float * d_delta_lenghts;
+    float * d_weights;
     std::vector<float> gpu_delta_table;
 
 };
