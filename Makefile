@@ -16,8 +16,13 @@ CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
 else ifeq ($(USER),mog)
 include buildconfig
 TOP= $(MAYA_LOCATION)/devkit/plug-ins
-#override gcc
-CXX= gcc481
+CXX = gcc481
+CUDA_LIB = -lcudart -lcudadevrt
+CUDA_PATH = /apps/Linux64/cuda/cuda-6.0.37
+CUDA_LIB_PATH = -L /apps/Linux64/cuda/cuda-6.0.37/lib64
+NVCC = $(CUDA_PATH)/bin/nvcc
+CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
+
 endif
 
 #defining source directory needed by build config

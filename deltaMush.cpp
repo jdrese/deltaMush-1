@@ -30,7 +30,7 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
                    float * d_in_buffer, float * d_out_buffer, 
                    int * h_neighbours, int * d_neighbours,
                    float * h_delta_table, float * d_delta_table,
-                   const int size,int iterationsV);
+                   const int size,int iterationsV, const float amountV);
 #endif
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
@@ -280,7 +280,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
                 gpu_delta_table.data(), d_delta_table,
-                size, iterationsV);
+                size, iterationsV, amountV);
 
 
         MPointArray outp;
@@ -399,6 +399,7 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                 mat[3][2] = 0;
                 mat[3][3] = 1;
                 
+                /*
                 if(i == 100 && n==0)
                 {
                     std::cout<<v1<<std::endl;
@@ -408,8 +409,14 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                     std::cout<<delta_table[ne]*mat<<std::endl;
                     std::cout<<"------"<<std::endl;
                 }
-
+                */
                 delta += (  delta_table[ne]* mat );
+                /*
+                if(i == 100 && n==0)
+                {
+                    std::cout<<"delta "<<(delta_table[ne]* mat )<<std::endl;
+                }
+                */
             //}
         }
 
