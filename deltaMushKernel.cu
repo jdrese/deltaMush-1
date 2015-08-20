@@ -195,62 +195,72 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
                    const float gloabalScale,
                    const float envelope,
                    const float applyDelta)
-    {
-        //copy the memory from cpu to gpu
-        int buffer_size = 3*size*sizeof(float);
-        
-        cudaError_t s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
-        if (s != cudaSuccess) 
-            printf("Error copying : %s\n", cudaGetErrorString(s));
-        
-        s = cudaMemcpy(d_neighbours, h_neighbours, 4*size*sizeof(int), cudaMemcpyHostToDevice);
-        if (s != cudaSuccess) 
-            printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-        
-        s = cudaMemcpy(d_delta_lenghts, h_delta_lengths, size*sizeof(float), cudaMemcpyHostToDevice);
-        if (s != cudaSuccess) 
-            printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-        
-        s = cudaMemcpy(d_weights, h_weights, size*sizeof(float), cudaMemcpyHostToDevice);
-        if (s != cudaSuccess) 
-            printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-        
-        //setup the kernel
-        int grain_size =128;
-        size_t width_blocks = ((size%grain_size) != 0)?(size/grain_size) +1: (size/grain_size); 
-        dim3 block_size(grain_size,1,1);
-        dim3 grid_size(width_blocks,1,1);
-        
-        float * trg= d_in_buffer;
-        float * src= d_out_buffer; 
-        float * tmp;
-        for (int i =0; i<iter; i++)
-        {
-            tmp = src;
-            src = trg;
-            trg =tmp; 
-            average_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size,amount);
-        }
+{
+    cudaEvent_t start, stop;  
+    cudaEventCreate(&start);
+cudaEventCreate(&stop);
+cudaEventRecord(start);
+    //copy the memory from cpu to gpu
+    int buffer_size = 3*size*sizeof(float);
 
-        //copy  original data back up
-        //if i run the above thread async i might be able to kick this extra memcpy already?
-        //to do so I might need another buffer tho
-        s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
-        if (s != cudaSuccess) 
-            printf("Error copying : %s\n", cudaGetErrorString(s));
-        //upload deltas 
-        s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
-        if (s != cudaSuccess) 
-            printf("Error copying : %s\n", cudaGetErrorString(s));
-        tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, 
-                                                  d_delta_table, d_neighbours,d_delta_lenghts,
-                                                  d_weights,size,
-                                                  gloabalScale, envelope, applyDelta);
+    cudaError_t s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+
+    s = cudaMemcpy(d_neighbours, h_neighbours, 4*size*sizeof(int), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
+
+    s = cudaMemcpy(d_delta_lenghts, h_delta_lengths, size*sizeof(float), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
+
+    s = cudaMemcpy(d_weights, h_weights, size*sizeof(float), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
+
+    //setup the kernel
+    int grain_size =128;
+    size_t width_blocks = ((size%grain_size) != 0)?(size/grain_size) +1: (size/grain_size); 
+    dim3 block_size(grain_size,1,1);
+    dim3 grid_size(width_blocks,1,1);
+
+    float * trg= d_in_buffer;
+    float * src= d_out_buffer; 
+    float * tmp;
+    for (int i =0; i<iter; i++)
+    {
+        tmp = src;
+        src = trg;
+        trg =tmp; 
+        average_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size,amount);
+    }
+
+    //copy  original data back up
+    //if i run the above thread async i might be able to kick this extra memcpy already?
+    //to do so I might need another buffer tho
+    s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+    //upload deltas 
+    s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+    tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, 
+            d_delta_table, d_neighbours,d_delta_lenghts,
+            d_weights,size,
+            gloabalScale, envelope, applyDelta);
 
     //copy data back
     s = cudaMemcpy(h_out_buffer, d_in_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
     if (s != cudaSuccess) 
-            printf("Error copying back: %s\n", cudaGetErrorString(s));
+        printf("Error copying back: %s\n", cudaGetErrorString(s));
+
+    cudaEventRecord(stop); 
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("cuda computation: %f millisec \n",milliseconds);
 }
 
 

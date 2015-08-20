@@ -15,11 +15,13 @@
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MArrayDataBuilder.h>
 #include <maya/MFnFloatArrayData.h>
-
+#include <chrono>
 #include <tbb/parallel_for.h>
 
 #define SMALL (float)1e-6
 
+using namespace std;
+using namespace std::chrono;
 //cuda calls 
 #if COMPUTE==1
 
@@ -159,7 +161,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 						unsigned int mIndex )
 {	
 	
-	double envelopeV = data.inputValue(envelope).asFloat();
+    high_resolution_clock::time_point t1 = high_resolution_clock::now();	
+    double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
 	
     #if COMPUTE==0
@@ -283,7 +286,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             h_out_buffer = new float[3*size]; 
             m_cuda_setup= true;
         }
-
         average_launcher(v_data, h_out_buffer, 
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
@@ -310,6 +312,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     }
     #endif
     
+    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+    float duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
+    std::cout<<"cpu total: "<<(duration /1000.0f)<<" ms"<<std::endl;
     return MStatus::kSuccess ; 
 }
 
