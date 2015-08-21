@@ -168,69 +168,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
 	
-    #if COMPUTE==0
-    //Preliminary check :
-	//Check if the ref mesh is connected
-	
-    MPlug refMeshPlug( thisMObject(), referenceMesh );
-    if (envelopeV > SMALL && iterationsV > 0 && refMeshPlug.isConnected() ) 
-    {
-        // Getting needed data
-        double applyDeltaV = data.inputValue(applyDelta).asDouble();
-        double amountV = data.inputValue(amount).asDouble();
-        bool rebindV = data.inputValue(rebind).asBool();
-        double globalScaleV = data.inputValue( globalScale).asDouble();
 
-        int size = iter.exactCount();
-        if (initialized == false || rebindV == true)
-        {
-            MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
-            pos.setLength(size);	
-            targetPos.setLength(size);
-            neigh_table.resize(size *MAX_NEIGH);
-            delta_table.resize(size *MAX_NEIGH);
-            delta_size.resize(size );
-            rebindData(referenceMeshV, iterationsV,amountV);
-
-            //read weights
-            getWeights(data,size);
-            initialized = true;
-        }
-
-        iter.allPositions(pos, MSpace::kObject);
-
-        //We need to work on a copy due to the fact that we need to preserve the original position 
-        //for blending afterwards 
-        
-        copy.copy(pos);
-        //here we invert already the source and targets since the swap appens before computtion and not 
-        //afterwards, the reason for that is in this way we are always sure that the final result is in the 
-        //target pointer
-        MPointArray * srcR = &targetPos;
-        MPointArray * trgR= &copy;
-        int it =0;
-        for (it = 0; it < iterationsV; it++)
-        {
-            swap(srcR, trgR);
-            Average_tbb kernel(srcR, trgR, iterationsV ,amountV, neigh_table);
-            tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
-        }
-        
-        if (applyDeltaV >= SMALL )
-        {
-            Tangent_tbb kernelT (trgR,&pos, applyDeltaV, globalScaleV, envelopeV,
-                            wgts, delta_size, delta_table, neigh_table);
-            tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernelT);
-
-            iter.setAllPositions(pos);
-
-        }
-        else
-        {
-            iter.setAllPositions(*trgR);
-        }
-    }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
-    #else
     
     MPlug refMeshPlug( thisMObject(), referenceMesh );
     if (envelopeV > SMALL && iterationsV > 0 && refMeshPlug.isConnected() ) 
@@ -284,6 +222,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             //what to upload or not, but usually weights and stuff are static
             upload_float(wgts.data(), d_weights, size);
             upload_float(delta_size.data(), d_delta_lenghts, size);
+            upload_float(gpu_delta_table.data(), d_delta_table, 9*size);
             upload_int(neigh_table.data(), d_neighbours, size*MAX_NEIGH);
             
             initialized = true;
@@ -297,7 +236,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         
         auto d8 = high_resolution_clock::now();
         auto dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
-        //std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
+        std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
         
         auto cu1 = high_resolution_clock::now();
         average_launcher(v_data.get(), h_out_buffer.get(), 
@@ -310,7 +249,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         auto cu2 = high_resolution_clock::now();
         float dtc= std::chrono::duration_cast<std::chrono::microseconds>( cu2 - cu1 ).count();
-        //std::cout<<"gpu kernel from cpu: "<<(dtc/1000.0f)<<" ms"<<std::endl;
+        std::cout<<"gpu kernel from cpu: "<<(dtc/1000.0f)<<" ms"<<std::endl;
 
         auto c1 = high_resolution_clock::now();
 
@@ -318,12 +257,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), btoa_kernel);
         auto c2 = high_resolution_clock::now();
         float dt= std::chrono::duration_cast<std::chrono::microseconds>( c2 - c1 ).count();
-        //std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
+        std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
         iter.setAllPositions(outp);
 
     }
-    #endif
-    
     
     auto t2 = high_resolution_clock::now();
     float duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();

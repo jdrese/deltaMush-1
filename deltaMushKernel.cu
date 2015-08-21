@@ -247,9 +247,9 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     if (s != cudaSuccess) 
         printf("Error copying : %s\n", cudaGetErrorString(s));
     //upload deltas 
-    s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying : %s\n", cudaGetErrorString(s));
+    //s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
+    //if (s != cudaSuccess) 
+    //    printf("Error copying : %s\n", cudaGetErrorString(s));
     tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, 
             d_delta_table, d_neighbours,d_delta_lenghts,
             d_weights,size,
@@ -264,7 +264,7 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     cudaEventSynchronize(stop);
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
-    //printf("cuda computation: %f millisec \n",milliseconds);
+    printf("cuda computation: %f millisec \n",milliseconds);
 }
 
 
