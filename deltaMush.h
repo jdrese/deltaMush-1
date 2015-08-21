@@ -64,6 +64,7 @@ private :
 	MPointArray pos;
 	MPointArray copy;
     
+    unique_ptr<float[]> v_data;
     std::vector<float> wgts;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;

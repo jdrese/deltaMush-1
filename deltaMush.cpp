@@ -276,26 +276,14 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         double globalScaleV = data.inputValue( globalScale).asDouble();
 
 
-        auto d7 = high_resolution_clock::now();
-        MPointArray pos;
-        iter.allPositions(pos, MSpace::kObject);
-        float * v_dataI = new float[size*3];
-        for(int i=0; i<size; i++)
-        {
-            v_dataI[i*3] = pos[i][0];    
-            v_dataI[i*3 +1] = pos[i][1];    
-            v_dataI[i*3 +2] = pos[i][2];    
-        }
-        auto d8 = high_resolution_clock::now();
-        auto dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
-        std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
 
         
         if (initialized == false || rebindV == true)
         {
             std::cout<<"initialize data"<<std::endl;
             MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
-            pos.setLength(size);	
+            
+            //pos.setLength(size);	
             targetPos.setLength(size);
             neigh_table.resize(size *MAX_NEIGH);
             delta_table.resize(size *MAX_NEIGH);
@@ -308,6 +296,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
             outp.setLength(size);
 
+            v_data = unique_ptr<float[]> (new float[size*3]);
 
             //read weights
             getWeights(data,size);
@@ -332,9 +321,20 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             upload_int(neigh_table.data(), d_neighbours, size*MAX_NEIGH);
             m_cuda_setup= true;
         }
+        auto d7 = high_resolution_clock::now();
+        iter.allPositions(pos, MSpace::kObject);
+        for(int i=0; i<size; i++)
+        {
+            v_data[i*3] = pos[i][0];    
+            v_data[i*3 +1] = pos[i][1];    
+            v_data[i*3 +2] = pos[i][2];    
+        }
+        auto d8 = high_resolution_clock::now();
+        auto dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
+        std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
         
         auto cu1 = high_resolution_clock::now();
-        average_launcher(v_dataI, h_out_buffer, 
+        average_launcher(v_data.get(), h_out_buffer, 
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
                 gpu_delta_table.data(), d_delta_table,
@@ -362,7 +362,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     float dt= std::chrono::duration_cast<std::chrono::microseconds>( c2 - c1 ).count();
     std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
         iter.setAllPositions(outp);
-    delete (v_dataI);
     
     }
     #endif
