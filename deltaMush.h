@@ -64,7 +64,6 @@ private :
 	MPointArray pos;
 	MPointArray copy;
     
-    unique_ptr<float[]> v_data;
     std::vector<float> wgts;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
@@ -73,7 +72,9 @@ private :
     bool initialized;
     //cuda stuff
     bool m_cuda_setup;
-    float * h_out_buffer;
+    unique_ptr<float[]> v_data;
+    unique_ptr<float[]> h_out_buffer;
+    //float * h_out_buffer;
     float * d_out_buffer;
     float * d_in_buffer;
     int* d_neighbours;

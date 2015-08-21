@@ -264,7 +264,7 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     cudaEventSynchronize(stop);
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("cuda computation: %f millisec \n",milliseconds);
+    //printf("cuda computation: %f millisec \n",milliseconds);
 }
 
 
