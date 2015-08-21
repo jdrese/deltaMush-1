@@ -70,13 +70,15 @@ __global__ void average_kernel(float * d_in_buffer,
     if(s_id<(size)*3)
     {
         //good case for intrinsinc?
-        //__DEVICE_FUNCTIONS_DECL__ unsigned int __vadd4 ( unsigned int  a, unsigned int  b )
         int id;
         float v[3] = {0.0f,0.0f,0.0f};
         float pos[3] = {0.0f,0.0f,0.0f};
+        
         pos[0] = d_in_buffer[s_id];
         pos[1] = d_in_buffer[s_id+1];
         pos[2] = d_in_buffer[s_id+2];
+        
+        #pragma unroll
         for (int i=0; i<4;i++)
         {
             id = d_neighbours[d_id+i]*3;
@@ -87,6 +89,7 @@ __global__ void average_kernel(float * d_in_buffer,
         v[0]*= FOUR_INV;
         v[1]*= FOUR_INV;
         v[2]*= FOUR_INV;
+        
         d_out_buffer[s_id] = pos[0] + (v[0]-pos[0]) * amount ; 
         d_out_buffer[s_id+1] = pos[1] + (v[1]-pos[1]) * amount ; 
         d_out_buffer[s_id+2] = pos[2] + (v[2]-pos[2]) * amount ; 
@@ -128,6 +131,8 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
         accum[0] =0;
         accum[1] =0;
         accum[2] =0;
+        
+        #pragma unroll
         for (int n=0; n<3;n++)
         {
 
@@ -152,8 +157,8 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
             v2[1] -= v0[1];
             v2[2] -= v0[2];
 
-            vec_norm(&v1[0]);
-            vec_norm(&v2[0]);
+            vec_norm(v1);
+            vec_norm(v2);
 
             cross_prod(v1,v2,cross);
             cross_prod(cross,v1,v2);
@@ -166,7 +171,6 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
 
         }
         vec_norm(accum);
-        //float dl =vec_len(&d_delta_table[delta_id ]); 
         accum[0] *= (d_delta_lenghts[len_id] *applyDelta* globalScale); 
         accum[1] *= (d_delta_lenghts[len_id] *applyDelta* globalScale); 
         accum[2] *= (d_delta_lenghts[len_id] *applyDelta* globalScale); 
