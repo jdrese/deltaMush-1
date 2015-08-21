@@ -163,7 +163,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 						unsigned int mIndex )
 {	
 	
-    high_resolution_clock::time_point t1 = high_resolution_clock::now();	
+    auto t1 = high_resolution_clock::now();	
     double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
 	
@@ -229,7 +229,6 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         {
             iter.setAllPositions(*trgR);
         }
-
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
     #else
     
@@ -240,13 +239,32 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         //CUDA
 
+        auto d1 = high_resolution_clock::now();	
         MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
+        auto d2 = high_resolution_clock::now();
+        float dtd= std::chrono::duration_cast<std::chrono::microseconds>( d2 - d1 ).count();
+        std::cout<<"select plug: "<<(dtd/1000.0f)<<" ms"<<std::endl;
+
+        
+        auto d3 = high_resolution_clock::now();	
         inMeshH.jumpToArrayElement( 0 ) ;
+        auto d4 = high_resolution_clock::now();
+        dtd= std::chrono::duration_cast<std::chrono::microseconds>( d4 - d3 ).count();
+        std::cout<<"jump plug: "<<(dtd/1000.0f)<<" ms"<<std::endl;
+        
+        //std::cout<<"data pull MBLOCK: "<<(dtd/1000.0f)<<" ms"<<std::endl;
+        auto d5 = high_resolution_clock::now();	
         MObject inMesh= inMeshH.inputValue().child( inputGeom ).asMesh() ;
+        auto d6 = high_resolution_clock::now();
+        dtd= std::chrono::duration_cast<std::chrono::microseconds>( d6 - d5 ).count();
+        std::cout<<"read plug: "<<(dtd/1000.0f)<<" ms"<<std::endl;
+        
+        
         MFnMesh meshFn(inMesh) ;
 
         //float am = data.inputValue(amount).asFloat();
-        float am = data.inputValue(amount).asDouble();
+        //float am = data.inputValue(amount).asDouble();
+
 
         MStatus stat;
         const float * v_data = meshFn.getRawPoints(&stat);
@@ -255,8 +273,19 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         double amountV = data.inputValue(amount).asDouble();
         bool rebindV = data.inputValue(rebind).asBool();
         double globalScaleV = data.inputValue( globalScale).asDouble();
+
+
+        auto d7 = high_resolution_clock::now();
+        MPointArray pos;
+        iter.allPositions(pos, MSpace::kObject);
+        auto d8 = high_resolution_clock::now();
+        dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
+        std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
+
+        
         if (initialized == false || rebindV == true)
         {
+            std::cout<<"initialize data"<<std::endl;
             MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
             pos.setLength(size);	
             targetPos.setLength(size);
@@ -268,6 +297,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
             delta_size.resize(size );
             rebindData(referenceMeshV, iterationsV,amountV);
+
+            outp.setLength(size);
 
 
             //read weights
@@ -293,6 +324,8 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             upload_int(neigh_table.data(), d_neighbours, size*MAX_NEIGH);
             m_cuda_setup= true;
         }
+        
+        auto cu1 = high_resolution_clock::now();
         average_launcher(v_data, h_out_buffer, 
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
@@ -301,25 +334,32 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                 wgts.data(), d_weights, 
                 size, iterationsV, amountV, globalScaleV, envelopeV,applyDeltaV);
 
+        auto cu2 = high_resolution_clock::now();
+        float dtc= std::chrono::duration_cast<std::chrono::microseconds>( cu2 - cu1 ).count();
+        std::cout<<"gpu kernel from cpu: "<<(dtc/1000.0f)<<" ms"<<std::endl;
 
-        MPointArray outp;
-        outp.setLength(size);
-
-        MPoint tmp;
+        auto c1 = high_resolution_clock::now();
         int c=0; 
         for (int i=0; i<size*3;i+=3,c++)
         {
-            tmp = MPoint((float)h_out_buffer[i],
-                        (float)h_out_buffer[i+1],
-                        (float)h_out_buffer[i+2],1.0f);
-            outp[c] =tmp ;
+            //tmp = MPoint((float)h_out_buffer[i],
+            //            (float)h_out_buffer[i+1],
+            //            (float)h_out_buffer[i+2],1.0f);
+            outp[c][0] = (float)h_out_buffer[i];
+            outp[c][1] = (float)h_out_buffer[i+1];
+            outp[c][2] = (float)h_out_buffer[i+2];
+            //outp[c] =tmp ;
         }
+    auto c2 = high_resolution_clock::now();
+    float dt= std::chrono::duration_cast<std::chrono::microseconds>( c2 - c1 ).count();
+    std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
         iter.setAllPositions(outp);
-
+    
     }
     #endif
     
-    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+    
+    auto t2 = high_resolution_clock::now();
     float duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
     std::cout<<"cpu total: "<<(duration /1000.0f)<<" ms"<<std::endl;
     return MStatus::kSuccess ; 

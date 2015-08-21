@@ -80,7 +80,7 @@ private :
     float * d_delta_lenghts;
     float * d_weights;
     std::vector<float> gpu_delta_table;
-
+    MPointArray outp;
 };
 struct Average_tbb
 {
