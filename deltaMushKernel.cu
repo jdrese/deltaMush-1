@@ -36,19 +36,6 @@ inline __device__ void cross_prod(const float * a, const float * b,float *c )
     c[2] = (a[0]*b[1]) - (a[1]*b[0]); 
 }
 
-/*
-inline __device__ void mat3_vec3_mult(const float * mx ,
-                                      const float * my , 
-                                      const float * mz , 
-                                      const float * v , 
-                                      float *res )
-{
-    res[0] = dot(mx,v);
-    res[1] = dot(my,v);
-    res[2] = dot(mz,v);
-}
-
-*/
 inline __device__ void mat3_vec3_mult(const float * mx ,
                                       const float * my , 
                                       const float * mz , 
@@ -182,6 +169,22 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
         
         }
 }
+void upload_float(float * h_data, float * d_data,int size)
+{
+    cudaError_t s = cudaMemcpy(d_data, h_data, size*sizeof(float), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+
+    
+}
+void upload_int(int * h_data, int * d_data, int size)
+{
+    cudaError_t s = cudaMemcpy(d_data, h_data, size*sizeof(float), cudaMemcpyHostToDevice);
+    if (s != cudaSuccess) 
+        printf("Error copying : %s\n", cudaGetErrorString(s));
+
+    
+}
 
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
                    float * d_in_buffer, float * d_out_buffer, 
@@ -198,27 +201,28 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
 {
     cudaEvent_t start, stop;  
     cudaEventCreate(&start);
-cudaEventCreate(&stop);
-cudaEventRecord(start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
     //copy the memory from cpu to gpu
     int buffer_size = 3*size*sizeof(float);
 
     cudaError_t s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
     if (s != cudaSuccess) 
         printf("Error copying : %s\n", cudaGetErrorString(s));
-
+    /*
     s = cudaMemcpy(d_neighbours, h_neighbours, 4*size*sizeof(int), cudaMemcpyHostToDevice);
     if (s != cudaSuccess) 
         printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-
+    
     s = cudaMemcpy(d_delta_lenghts, h_delta_lengths, size*sizeof(float), cudaMemcpyHostToDevice);
     if (s != cudaSuccess) 
         printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
 
+    
     s = cudaMemcpy(d_weights, h_weights, size*sizeof(float), cudaMemcpyHostToDevice);
     if (s != cudaSuccess) 
         printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-
+    */
     //setup the kernel
     int grain_size =128;
     size_t width_blocks = ((size%grain_size) != 0)?(size/grain_size) +1: (size/grain_size); 

@@ -27,6 +27,8 @@ using namespace std::chrono;
 
 float * allocate_bufferFloat(int size, int stride);
 int * allocate_bufferInt(int size, int stride);
+void upload_float(float * h_data, float * d_data, int size);
+void upload_int(int * h_data, int * d_data, int size);
 void kernel_tear_down(float * d_in_buffer, float * d_out_buffer, int * d_neigh_table, float * d_delta_table,
                     float * d_delta_lenghts, float * d_weights);
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
@@ -270,6 +272,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
             //read weights
             getWeights(data,size);
+            
             initialized = true;
         }
 
@@ -284,6 +287,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             d_delta_lenghts= allocate_bufferFloat(size,1);
             d_weights= allocate_bufferFloat(size,1);
             h_out_buffer = new float[3*size]; 
+            
+            upload_float(wgts.data(), d_weights, size);
+            upload_float(delta_size.data(), d_delta_lenghts, size);
+            upload_int(neigh_table.data(), d_neighbours, size*MAX_NEIGH);
             m_cuda_setup= true;
         }
         average_launcher(v_data, h_out_buffer, 
