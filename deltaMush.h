@@ -130,6 +130,29 @@ struct Tangent_tbb
 
 };
 
+struct MPointArrayToBuffer
+{
+    public:
+        MPointArrayToBuffer(MPointArray & parr,
+                            float * buffer);
+        void operator() (const tbb::blocked_range<size_t>& r)const;
+    private:
+        MPointArray & m_parr;
+        float * m_buffer;
+
+};
+
+struct BufferToMPointArray
+{
+    public:
+        BufferToMPointArray( MPointArray & parr,
+                            float * buffer);
+        void operator() (const tbb::blocked_range<size_t>& r)const;
+    private:
+        MPointArray & m_parr;
+        float * m_buffer;
+
+};
 #endif
 
 

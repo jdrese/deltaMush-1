@@ -323,12 +323,17 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         }
         auto d7 = high_resolution_clock::now();
         iter.allPositions(pos, MSpace::kObject);
+        MPointArrayToBuffer atob_kernel(pos, v_data.get()); 
+        tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), atob_kernel);
+        
+        /*
         for(int i=0; i<size; i++)
         {
             v_data[i*3] = pos[i][0];    
             v_data[i*3 +1] = pos[i][1];    
             v_data[i*3 +2] = pos[i][2];    
         }
+        */
         auto d8 = high_resolution_clock::now();
         auto dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
         std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
@@ -347,6 +352,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         std::cout<<"gpu kernel from cpu: "<<(dtc/1000.0f)<<" ms"<<std::endl;
 
         auto c1 = high_resolution_clock::now();
+        /*
         int c=0; 
         for (int i=0; i<size*3;i+=3,c++)
         {
@@ -358,6 +364,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             outp[c][2] = (float)h_out_buffer[i+2];
             //outp[c] =tmp ;
         }
+        */
+        
+        BufferToMPointArray btoa_kernel(outp, h_out_buffer); 
+        tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), btoa_kernel);
     auto c2 = high_resolution_clock::now();
     float dt= std::chrono::duration_cast<std::chrono::microseconds>( c2 - c1 ).count();
     std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
@@ -496,6 +506,34 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
     }
 
 
+}
+
+MPointArrayToBuffer::MPointArrayToBuffer(MPointArray & parr, float * buffer): 
+                                                m_parr(parr), m_buffer(buffer)
+{}
+
+void MPointArrayToBuffer::operator() (const tbb::blocked_range<size_t>& r)const
+{
+        for(int i=r.begin(); i<r.end(); i++)
+        {
+            m_buffer[i*3] = m_parr[i][0];    
+            m_buffer[i*3 +1] = m_parr[i][1];    
+            m_buffer[i*3 +2] = m_parr[i][2];    
+        }
+}
+
+BufferToMPointArray::BufferToMPointArray(MPointArray & parr, float * buffer): 
+                                                m_parr(parr), m_buffer(buffer)
+{}
+
+void BufferToMPointArray::operator() (const tbb::blocked_range<size_t>& r)const
+{
+        for(int i=r.begin(); i<r.end(); i++)
+        {
+            m_parr[i][0] = m_buffer[i*3];
+            m_parr[i][1] = m_buffer[i*3+1];
+            m_parr[i][2] = m_buffer[i*3+2];
+        }
 }
 
 void DeltaMush::initData(
