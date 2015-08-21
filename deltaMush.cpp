@@ -164,7 +164,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 						unsigned int mIndex )
 {	
 	
+    #if PROFILE==1
     auto t1 = high_resolution_clock::now();	
+    #endif
     double envelopeV = data.inputValue(envelope).asFloat();
 	int iterationsV = data.inputValue(iterations).asInt();
 	
@@ -173,10 +175,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     MPlug refMeshPlug( thisMObject(), referenceMesh );
     if (envelopeV > SMALL && iterationsV > 0 && refMeshPlug.isConnected() ) 
     {
-        int i=0;
-
-        //CUDA
-        const int size = iter.exactCount(); 
+        const int size = iter.count(); 
         double applyDeltaV = data.inputValue(applyDelta).asDouble();
         double amountV = data.inputValue(amount).asDouble();
         bool rebindV = data.inputValue(rebind).asBool();
@@ -184,14 +183,12 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         
         if(!m_cuda_setup)
         {
-            //std::cout<<"setting cuda stuff"<<std::endl;
             d_in_buffer = allocate_bufferFloat(size,3);
             d_out_buffer = allocate_bufferFloat(size,3);
             d_neighbours= allocate_bufferInt(size,MAX_NEIGH);
             d_delta_table= allocate_bufferFloat(size,9);
             d_delta_lenghts= allocate_bufferFloat(size,1);
             d_weights= allocate_bufferFloat(size,1);
-            //h_out_buffer = new float[3*size]; 
             v_data = unique_ptr<float[]> (new float[size*3]);
             h_out_buffer= unique_ptr<float[]> (new float[size*3]);
             gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
@@ -205,7 +202,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         if (initialized == false || rebindV == true)
         {
             //std::cout<<"initialize data"<<std::endl;
-            MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
+            MObject referenceMeshV = data.inputValue(referenceMesh).data();
             
             //pos.setLength(size);	
             targetPos.setLength(size);
@@ -228,17 +225,10 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             initialized = true;
         }
 
-
-        auto d7 = high_resolution_clock::now();
         iter.allPositions(pos, MSpace::kObject);
         MPointArrayToBuffer atob_kernel(pos, v_data.get()); 
         tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), atob_kernel);
         
-        auto d8 = high_resolution_clock::now();
-        auto dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
-        std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
-        
-        auto cu1 = high_resolution_clock::now();
         average_launcher(v_data.get(), h_out_buffer.get(), 
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
@@ -247,24 +237,16 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
                 wgts.data(), d_weights, 
                 size, iterationsV, amountV, globalScaleV, envelopeV,applyDeltaV);
 
-        auto cu2 = high_resolution_clock::now();
-        float dtc= std::chrono::duration_cast<std::chrono::microseconds>( cu2 - cu1 ).count();
-        std::cout<<"gpu kernel from cpu: "<<(dtc/1000.0f)<<" ms"<<std::endl;
-
-        auto c1 = high_resolution_clock::now();
-
         BufferToMPointArray btoa_kernel(outp, h_out_buffer.get()); 
         tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), btoa_kernel);
-        auto c2 = high_resolution_clock::now();
-        float dt= std::chrono::duration_cast<std::chrono::microseconds>( c2 - c1 ).count();
-        std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
         iter.setAllPositions(outp);
 
     }
-    
+    #if PROFILE==1    
     auto t2 = high_resolution_clock::now();
     float duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
     std::cout<<"cpu total: "<<(duration /1000.0f)<<" ms"<<std::endl;
+    #endif
     return MStatus::kSuccess ; 
 }
 
@@ -296,7 +278,7 @@ void Average_tbb::operator()( const tbb::blocked_range<size_t>& r) const
         {
             ne = neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
             //need to work on this if, find a way to remove it
-                temp += (*source)[ne];					
+            temp += (*source)[ne];					
         }
         temp/= DeltaMush::MAX_NEIGH;
         (*target)[i] =(*source)[i] +  (temp - (*source)[i] )*amountV;
@@ -360,25 +342,7 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                 mat[3][2] = 0;
                 mat[3][3] = 1;
                 
-                /*
-                if(i == 100 && n==0)
-                {
-                    std::cout<<v1<<std::endl;
-                    std::cout<<v2<<std::endl;
-                    std::cout<<cross<<std::endl;
-                    std::cout<<delta_table[ne]<<std::endl;
-                    std::cout<<delta_table[ne]*mat<<std::endl;
-                    std::cout<<"------"<<std::endl;
-                }
-                */
                 delta += (  delta_table[ne]* mat );
-                /*
-                if(i == 100 && n==0)
-                {
-                    std::cout<<"delta "<<(delta_table[ne]* mat )<<std::endl;
-                }
-                */
-            //}
         }
 
         delta= delta.normal()*delta_size[i]*applyDeltaV*globalScaleV; 

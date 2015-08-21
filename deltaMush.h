@@ -74,7 +74,6 @@ private :
     bool m_cuda_setup;
     unique_ptr<float[]> v_data;
     unique_ptr<float[]> h_out_buffer;
-    //float * h_out_buffer;
     float * d_out_buffer;
     float * d_in_buffer;
     int* d_neighbours;

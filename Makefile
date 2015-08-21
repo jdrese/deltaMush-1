@@ -25,6 +25,10 @@ CUDA_FLAGS =  -arch=sm_30 --compiler-options '-fPIC'
 
 endif
 
+#profile flag
+PROFILE ?= 0
+CUDA_FLAGS += -DPROFILE=$(PROFILE)
+
 #defining source directory needed by build config
 SRCDIR=.
 
@@ -32,9 +36,9 @@ BUILD := release
 ifeq ($(BUILD),debug)
 C++FLAGS += -g
 endif
-COMPUTE := 1 
+COMPUTE ?= 1 
 #adding custom flags
-C++FLAGS +=  -funroll-loops -msse4 -DMaya$(mayaVersion) -DCOMPUTE=$(COMPUTE)
+C++FLAGS +=  -funroll-loops -msse4 -DMaya$(mayaVersion) -DCOMPUTE=$(COMPUTE) -DPROFILE=$(PROFILE)
 #-Wconversion
 #extra flags for maya 2016
 ifeq ($(mayaVersion),2016)

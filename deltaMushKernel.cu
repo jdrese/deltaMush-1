@@ -205,10 +205,12 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
                    const float envelope,
                    const float applyDelta)
 {
+    #if PROFILE==1
     cudaEvent_t start, stop;  
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
+    #endif
     //copy the memory from cpu to gpu
     int buffer_size = 3*size*sizeof(float);
 
@@ -238,12 +240,13 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
 
     //copy data back
     gpuErrchk( cudaMemcpy(h_out_buffer, d_in_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost));
-
+    #if PROFILE==1
     cudaEventRecord(stop); 
     cudaEventSynchronize(stop);
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("cuda computation: %f millisec \n",milliseconds);
+    #endif
 }
 
 
