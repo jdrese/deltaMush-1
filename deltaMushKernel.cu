@@ -1,11 +1,10 @@
-
-
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <iostream>
 #include <cstdio>
 
 #define GRAIN_SIZE 128
+__constant__ __device__ float FOUR_INV = 1.0f/4.0f;
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -16,6 +15,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
       if (abort) exit(code);
    }
 }
+
+
+
 //convert all to use float3 for consistency?
 // or float4 to maximize memory bandwith? not sure if applicable
 //check for intrinsic SSE operations
@@ -27,10 +29,10 @@ __inline__ __device__ float vec_len( float * vec)
 
 __inline__ __device__ void vec_norm( float * vec)
 {
-    float len = vec_len(vec);
-    vec[0] /= len;
-    vec[1] /= len;
-    vec[2] /= len;
+    float len = 1.0f /vec_len(vec);
+    vec[0] *= len;
+    vec[1] *= len;
+    vec[2] *= len;
 }
 // dot product
 inline __device__ float dot(const float * a, const float * b)
@@ -82,14 +84,12 @@ __global__ void average_kernel(float * d_in_buffer,
             v[1] += d_in_buffer[id+1]; 
             v[2] += d_in_buffer[id+2]; 
         }
-        v[0]/= 4.0f;
-        v[1]/= 4.0f;
-        v[2]/= 4.0f;
+        v[0]*= FOUR_INV;
+        v[1]*= FOUR_INV;
+        v[2]*= FOUR_INV;
         d_out_buffer[s_id] = pos[0] + (v[0]-pos[0]) * amount ; 
         d_out_buffer[s_id+1] = pos[1] + (v[1]-pos[1]) * amount ; 
         d_out_buffer[s_id+2] = pos[2] + (v[2]-pos[2]) * amount ; 
-        //d_out_buffer[s_id+1] = v[1]; 
-        //d_out_buffer[s_id+2] = v[2]; 
     }
 }
 
