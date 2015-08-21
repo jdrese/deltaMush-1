@@ -238,7 +238,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         int i=0;
 
         //CUDA
-
+        /*
         auto d1 = high_resolution_clock::now();	
         MArrayDataHandle inMeshH= data.inputArrayValue( input ) ;
         auto d2 = high_resolution_clock::now();
@@ -268,6 +268,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 
         MStatus stat;
         const float * v_data = meshFn.getRawPoints(&stat);
+        */
         const int size = iter.exactCount(); 
         double applyDeltaV = data.inputValue(applyDelta).asDouble();
         double amountV = data.inputValue(amount).asDouble();
@@ -278,8 +279,15 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         auto d7 = high_resolution_clock::now();
         MPointArray pos;
         iter.allPositions(pos, MSpace::kObject);
+        float * v_dataI = new float[size*3];
+        for(int i=0; i<size; i++)
+        {
+            v_dataI[i*3] = pos[i][0];    
+            v_dataI[i*3 +1] = pos[i][1];    
+            v_dataI[i*3 +2] = pos[i][2];    
+        }
         auto d8 = high_resolution_clock::now();
-        dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
+        auto dtd= std::chrono::duration_cast<std::chrono::microseconds>( d8 - d7 ).count();
         std::cout<<"read all pos from iter: "<<(dtd/1000.0f)<<" ms"<<std::endl;
 
         
@@ -326,7 +334,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         }
         
         auto cu1 = high_resolution_clock::now();
-        average_launcher(v_data, h_out_buffer, 
+        average_launcher(v_dataI, h_out_buffer, 
                 d_in_buffer, d_out_buffer, 
                 neigh_table.data(), d_neighbours,
                 gpu_delta_table.data(), d_delta_table,
@@ -354,6 +362,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     float dt= std::chrono::duration_cast<std::chrono::microseconds>( c2 - c1 ).count();
     std::cout<<"cpu data copy: "<<(dt/1000.0f)<<" ms"<<std::endl;
         iter.setAllPositions(outp);
+    delete (v_dataI);
     
     }
     #endif
