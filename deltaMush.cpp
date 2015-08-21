@@ -264,7 +264,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     
     auto t2 = high_resolution_clock::now();
     float duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
-    //std::cout<<"cpu total: "<<(duration /1000.0f)<<" ms"<<std::endl;
+    std::cout<<"cpu total: "<<(duration /1000.0f)<<" ms"<<std::endl;
     return MStatus::kSuccess ; 
 }
 

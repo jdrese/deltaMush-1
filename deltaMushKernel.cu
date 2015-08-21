@@ -5,7 +5,17 @@
 #include <iostream>
 #include <cstdio>
 
+#define GRAIN_SIZE 128
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
 //convert all to use float3 for consistency?
 // or float4 to maximize memory bandwith? not sure if applicable
 //check for intrinsic SSE operations
@@ -171,19 +181,11 @@ __global__ void tangnet_kernel(float * d_smooth, float * d_original,
 }
 void upload_float(float * h_data, float * d_data,int size)
 {
-    cudaError_t s = cudaMemcpy(d_data, h_data, size*sizeof(float), cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying : %s\n", cudaGetErrorString(s));
-
-    
+    gpuErrchk(cudaMemcpy(d_data, h_data, size*sizeof(float), cudaMemcpyHostToDevice));
 }
 void upload_int(int * h_data, int * d_data, int size)
 {
-    cudaError_t s = cudaMemcpy(d_data, h_data, size*sizeof(float), cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying : %s\n", cudaGetErrorString(s));
-
-    
+    gpuErrchk(cudaMemcpy(d_data, h_data, size*sizeof(float), cudaMemcpyHostToDevice));
 }
 
 void average_launcher(const float * h_in_buffer, float * h_out_buffer, 
@@ -206,27 +208,10 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
     //copy the memory from cpu to gpu
     int buffer_size = 3*size*sizeof(float);
 
-    cudaError_t s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying : %s\n", cudaGetErrorString(s));
-    /*
-    s = cudaMemcpy(d_neighbours, h_neighbours, 4*size*sizeof(int), cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
+    gpuErrchk(cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice));
     
-    s = cudaMemcpy(d_delta_lenghts, h_delta_lengths, size*sizeof(float), cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-
-    
-    s = cudaMemcpy(d_weights, h_weights, size*sizeof(float), cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying neigh_table: %s\n", cudaGetErrorString(s));
-    */
-    //setup the kernel
-    int grain_size =128;
-    size_t width_blocks = ((size%grain_size) != 0)?(size/grain_size) +1: (size/grain_size); 
-    dim3 block_size(grain_size,1,1);
+    size_t width_blocks = ((size%GRAIN_SIZE) != 0)?(size/GRAIN_SIZE) +1: (size/GRAIN_SIZE); 
+    dim3 block_size(GRAIN_SIZE,1,1);
     dim3 grid_size(width_blocks,1,1);
 
     float * trg= d_in_buffer;
@@ -240,25 +225,15 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
         average_kernel<<<grid_size, block_size>>>(src, trg, d_neighbours, size,amount);
     }
 
-    //copy  original data back up
-    //if i run the above thread async i might be able to kick this extra memcpy already?
-    //to do so I might need another buffer tho
-    s = cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice);
-    if (s != cudaSuccess) 
-        printf("Error copying : %s\n", cudaGetErrorString(s));
-    //upload deltas 
-    //s = cudaMemcpy(d_delta_table, h_delta_table, 9*size*sizeof(float), cudaMemcpyHostToDevice);
-    //if (s != cudaSuccess) 
-    //    printf("Error copying : %s\n", cudaGetErrorString(s));
+    gpuErrchk(cudaMemcpy(d_in_buffer, h_in_buffer, buffer_size, cudaMemcpyHostToDevice));
+    
     tangnet_kernel<<<grid_size, block_size>>>(d_out_buffer, d_in_buffer, 
             d_delta_table, d_neighbours,d_delta_lenghts,
             d_weights,size,
             gloabalScale, envelope, applyDelta);
 
     //copy data back
-    s = cudaMemcpy(h_out_buffer, d_in_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost);
-    if (s != cudaSuccess) 
-        printf("Error copying back: %s\n", cudaGetErrorString(s));
+    gpuErrchk( cudaMemcpy(h_out_buffer, d_in_buffer, 3*size*sizeof(float), cudaMemcpyDeviceToHost));
 
     cudaEventRecord(stop); 
     cudaEventSynchronize(stop);
@@ -271,19 +246,13 @@ void average_launcher(const float * h_in_buffer, float * h_out_buffer,
 float * allocate_bufferFloat(int size, int stride)
 {
     float * buffer;
-    cudaError_t result;
-    result = cudaMalloc((void **) &buffer,stride*size * sizeof(float));
-    if (result != cudaSuccess) 
-            printf("Error: %s\n", cudaGetErrorString(result));
+    gpuErrchk(cudaMalloc((void **) &buffer,stride*size * sizeof(float)));
     return buffer;
 }
 int * allocate_bufferInt(int size, int stride)
 {
     int * buffer;
-    cudaError_t result;
-    result = cudaMalloc((void **) &buffer,stride*size * sizeof(int));
-    if (result != cudaSuccess) 
-            printf("Error: %s\n", cudaGetErrorString(result));
+    gpuErrchk(cudaMalloc((void **) &buffer,stride*size * sizeof(int)));
     return buffer;
 }
 
