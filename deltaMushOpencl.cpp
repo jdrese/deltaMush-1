@@ -40,15 +40,24 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     if ( !fKernel.get() )
     {
         // Get and compile the kernel.
-        MString openCLKernelName("deltaMushOpencl");
+        MString openCLKernelName("AverageOpencl");
+        MString openCLKernelNameTan("TangentSpaceOpencl");
         MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
         MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelName );
+        tangent_kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelNameTan);
 
         if ( kernel.isNull() )
         {
             return MPxGPUDeformer::kDeformerFailure;
         }
         fKernel = kernel;
+        
+        if ( tangent_kernel.isNull() )
+        {
+            std::cout<<"error getting second kernel from file"<<std::endl;
+            return MPxGPUDeformer::kDeformerFailure;
+        }
+        
         
         // Figure out a good work group size for our kernel.
         fLocalWorkSize = 0;
@@ -136,6 +145,37 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
 
         MOpenCLInfo::checkCLErrorStatus(err);
     }
+    
+    //calling tangent space kernel
+    //
+        unsigned int parameterId = 0;
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), trg);
+        MOpenCLInfo::checkCLErrorStatus(err);
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_neig_table);
+        MOpenCLInfo::checkCLErrorStatus(err);
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), src);
+        MOpenCLInfo::checkCLErrorStatus(err);
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_uint), (void*)&numElements);
+        MOpenCLInfo::checkCLErrorStatus(err);
+
+        // Run the kernel
+        err = clEnqueueNDRangeKernel(
+                MOpenCLInfo::getOpenCLCommandQueue() ,
+                tangent_kernel.get() ,
+                1 ,
+                NULL ,
+                &fGlobalWorkSize ,
+                &fLocalWorkSize ,
+                eventCount ,
+                events ,
+                outputEvent.getReferenceForAssignment()
+
+                );
+        
+        //temp.getReferenceForAssignment() 
+
+        //
+        MOpenCLInfo::checkCLErrorStatus(err);
 
     if ( err != CL_SUCCESS )
     {

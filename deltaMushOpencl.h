@@ -29,6 +29,7 @@ public:
 private:
     // Kernel
     MAutoCLKernel fKernel;
+    MAutoCLKernel tangent_kernel; 
     size_t fLocalWorkSize;
     size_t fGlobalWorkSize;
     int m_size; 
