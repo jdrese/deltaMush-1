@@ -3,6 +3,7 @@
 #include <maya/MObject.h>
 #include <maya/MFnMesh.h>
 #include <maya/MItMeshVertex.h>
+
 const int DeltaMushOpencl::MAX_NEIGH = 4;
 
 MGPUDeformerRegistrationInfo* DeltaMushOpencl::getGPUDeformerInfo()
@@ -75,6 +76,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         }
         else
         {
+    
             fGlobalWorkSize = numElements;
         }
         //init data builds the neighbour table and we are going to upload it
@@ -82,7 +84,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         initData(referenceMeshV);
         //creation and upload
         cl_int clStatus;
-        d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
+        d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
                                        m_size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);               
         MOpenCLInfo::checkCLErrorStatus(clStatus);    
     }
@@ -97,7 +99,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     MOpenCLInfo::checkCLErrorStatus(err);
     err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_uint), (void*)&numElements);
     MOpenCLInfo::checkCLErrorStatus(err);
-    
     // Set up our input events.  The input event could be NULL, in that case we need to pass
     // slightly different parameters into clEnqueueNDRangeKernel.
     cl_event events[ 1 ] = { 0 };
