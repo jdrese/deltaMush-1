@@ -154,7 +154,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         int size = iter.exactCount();
         if (initialized == false || rebindV == true)
         {
-            MObject referenceMeshV = data.inputValue(referenceMesh).asMesh();
+            MObject referenceMeshV = data.inputValue(referenceMesh).data();
             pos.setLength(size);	
             targetPos.setLength(size);
             neigh_table.resize(size *MAX_NEIGH);
