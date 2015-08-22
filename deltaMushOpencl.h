@@ -1,7 +1,10 @@
 #include <maya/MPxGPUDeformer.h>
 #include <maya/MGPUDeformerRegistry.h>
+#include <maya/MDataBlock.h>
 #include <maya/MOpenCLInfo.h>
 #include <clew/clew_cl.h>
+#include <vector>
+
 
 #ifndef __DELTA_MUSH_OPENCL__
 #define __DELTA_MUSH_OPENCL__
@@ -21,11 +24,17 @@ public:
                                                     const MPlug& plug, unsigned int, const MAutoCLMem, 
                                                     const MAutoCLEvent, MAutoCLMem, MAutoCLEvent&);
     virtual void terminate();
+    void initData( MObject &mesh);
+    static const int MAX_NEIGH;
 private:
     // Kernel
     MAutoCLKernel fKernel;
     size_t fLocalWorkSize;
     size_t fGlobalWorkSize;
+    int m_size; 
+    //cl buffers
+    cl_mem d_neig_table;
+    std::vector<int> neigh_table;
 };
 
 

@@ -1,6 +1,9 @@
 #include "deltaMushOpencl.h"
-
-
+#include "deltaMush.h"
+#include <maya/MObject.h>
+#include <maya/MFnMesh.h>
+#include <maya/MItMeshVertex.h>
+const int DeltaMushOpencl::MAX_NEIGH = 4;
 
 MGPUDeformerRegistrationInfo* DeltaMushOpencl::getGPUDeformerInfo()
 {
@@ -36,11 +39,10 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     if ( !fKernel.get() )
     {
         // Get and compile the kernel.
-        const char* mayaLocation = getenv( "MAYA_LOCATION" );
-        MString openCLKernelFile( mayaLocation );
-        openCLKernelFile +="/devkit/plug-ins/identityNode/identity.cl";
-        MString openCLKernelName("identity");
-        MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel( openCLKernelFile, openCLKernelName );
+        MString openCLKernelName("deltaMushOpencl");
+        MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
+        MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelName );
+
         if ( kernel.isNull() )
         {
             return MPxGPUDeformer::kDeformerFailure;
@@ -59,6 +61,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             &fLocalWorkSize,
             &retSize
             );
+
         MOpenCLInfo::checkCLErrorStatus(err);
         if ( err != CL_SUCCESS || retSize == 0 || fLocalWorkSize == 0)
         {
@@ -74,9 +77,100 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         {
             fGlobalWorkSize = numElements;
         }
+        //init data builds the neighbour table and we are going to upload it
+        MObject referenceMeshV = block.inputValue(DeltaMush::referenceMesh).data();
+        initData(referenceMeshV);
+        //creation and upload
+        cl_int clStatus;
+        d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
+                                       m_size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);               
+        MOpenCLInfo::checkCLErrorStatus(clStatus);    
     }
-
+    // Set all of our kernel parameters.  Input buffer and output buffer may be changing every frame
+    // so always set them.
+    unsigned int parameterId = 0;
+    err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)outputBuffer.getReadOnlyRef());
+    MOpenCLInfo::checkCLErrorStatus(err);
+    err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_neig_table);
+    MOpenCLInfo::checkCLErrorStatus(err);
+    err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)inputBuffer.getReadOnlyRef());
+    MOpenCLInfo::checkCLErrorStatus(err);
+    err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_uint), (void*)&numElements);
+    MOpenCLInfo::checkCLErrorStatus(err);
+    
+    // Set up our input events.  The input event could be NULL, in that case we need to pass
+    // slightly different parameters into clEnqueueNDRangeKernel.
+    cl_event events[ 1 ] = { 0 };
+    cl_uint eventCount = 0;
+    
+    if ( inputEvent.get() )
+    {
+        events[ eventCount++ ] = inputEvent.get();
+    }
+    // Run the kernel
+    err = clEnqueueNDRangeKernel(
+        MOpenCLInfo::getOpenCLCommandQueue() ,
+        fKernel.get() ,
+        1 ,
+        NULL ,
+        &fGlobalWorkSize ,
+        &fLocalWorkSize ,
+        eventCount ,
+        events ,
+        outputEvent.getReferenceForAssignment()
+        );
+    
+    MOpenCLInfo::checkCLErrorStatus(err);
+    if ( err != CL_SUCCESS )
+    {
+        return MPxGPUDeformer::kDeformerFailure;
+    }
         return MPxGPUDeformer::kDeformerSuccess;
+}
+
+void DeltaMushOpencl::initData(
+    			 MObject &mesh)
+{
+	MFnMesh meshFn(mesh);
+	int size = meshFn.numVertices();
+    m_size = size;
+    neigh_table.resize(size * MAX_NEIGH);
+	MPointArray pos,res;
+	MItMeshVertex iter(mesh);
+	iter.reset();
+	//meshFn.getPoints(pos , MSpace::kWorld);
+	
+    MIntArray neig_tmp;
+    int nsize;
+	for (int i = 0; i < size; i++,iter.next())
+	{
+		//point_data pt;
+		iter.getConnectedVertices(neig_tmp);	
+		nsize = neig_tmp.length();
+		//dataPoints[i] = pt;
+        if (nsize>=MAX_NEIGH)
+        {
+           neigh_table[i*MAX_NEIGH] = neig_tmp[0];
+           neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
+           neigh_table[(i*MAX_NEIGH)+2] = neig_tmp[2];
+           neigh_table[(i*MAX_NEIGH)+3] = neig_tmp[3];
+        } 
+        else
+        {
+            for (int n =0; n<MAX_NEIGH;n++)
+            {
+               if(n<nsize)
+               {
+                    neigh_table[(i*MAX_NEIGH)+n] = neig_tmp[n];
+               } 
+               else
+                {
+                    //neigh_table[(i*MAX_NEIGH)+n] = -1;
+                    neigh_table[(i*MAX_NEIGH)+n] = neigh_table[(i*MAX_NEIGH)];
+                }
+            }
+        }
+	}
 }
 void DeltaMushOpencl::terminate()
 {
