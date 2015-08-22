@@ -40,10 +40,9 @@ endif
 
 #compiling object and targets
 TARGET= deltaMush.so
-OBJS = deltaMush.o pluginMain.o 
+OBJS = deltaMush.o pluginMain.o  deltaMushOpencl.o
 
 all : $(OBJS) 
-	echo $(BUILD)
 	$(LD)    $? -o $(TARGET) $(LFLAGS) $(LIBS) -lOpenMaya -lOpenMayaAnim -lFoundation -ltbb
 %.o: %.cpp
 	$(CXX) $(C++FLAGS) $(INCLUDES) -c $< -o $@ 
