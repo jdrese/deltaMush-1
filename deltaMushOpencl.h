@@ -41,6 +41,7 @@ private:
     //cl buffers
     cl_mem d_neig_table;
     cl_mem d_delta_table;
+    cl_mem d_delta_size;
     cl_mem d_secondary;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
