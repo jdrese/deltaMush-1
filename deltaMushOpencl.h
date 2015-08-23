@@ -2,6 +2,7 @@
 #include <maya/MGPUDeformerRegistry.h>
 #include <maya/MDataBlock.h>
 #include <maya/MOpenCLInfo.h>
+#include <maya/MPointArray.h>
 #include <clew/clew_cl.h>
 #include <vector>
 
@@ -23,8 +24,12 @@ public:
     virtual MPxGPUDeformer::DeformerStatus evaluate(MDataBlock&, const MEvaluationNode&, 
                                                     const MPlug& plug, unsigned int, const MAutoCLMem, 
                                                     const MAutoCLEvent, MAutoCLMem, MAutoCLEvent&);
+    MPxGPUDeformer::DeformerStatus setup_kernel(MDataBlock& block,int numElements);
     virtual void terminate();
     void initData( MObject &mesh);
+    void computeDelta(MPointArray& source ,
+					   MPointArray& target);
+    void rebindData(MObject &mesh, int iter, double amount);
     static const int MAX_NEIGH;
 private:
     // Kernel
@@ -35,7 +40,10 @@ private:
     int m_size; 
     //cl buffers
     cl_mem d_neig_table;
+    cl_mem d_delta_table;
     std::vector<int> neigh_table;
+    std::vector<MVector> delta_table;
+    std::vector<float> delta_size;
 };
 
 

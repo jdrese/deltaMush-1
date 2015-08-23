@@ -365,40 +365,40 @@ void DeltaMush::computeDelta(MPointArray& source ,
 		delta = MVector ( source[i] - target[i] );
 		delta_size[i] = delta.length();
 		//get tangent matrices
-		for (n = 0; n<MAX_NEIGH-1; n++)
-		{
-                    ne = i*MAX_NEIGH + n; 
-                    
-                    if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
-                    {
-			v1 = target[ neigh_table[ne] ] - target[i] ;
-			v2 = target[ neigh_table[ne+1] ] - target[i] ;
-					 
-			v2.normalize();
-			v1.normalize();
+        for (n = 0; n<MAX_NEIGH-1; n++)
+        {
+            ne = i*MAX_NEIGH + n; 
 
-			cross = v1 ^ v2;
-			v2 = cross ^ v1;
+            if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
+            {
+                v1 = target[ neigh_table[ne] ] - target[i] ;
+                v2 = target[ neigh_table[ne+1] ] - target[i] ;
 
-			mat = MMatrix();
-			mat[0][0] = v1.x;
-			mat[0][1] = v1.y;
-			mat[0][2] = v1.z;
-			mat[0][3] = 0;
-			mat[1][0] = v2.x;
-			mat[1][1] = v2.y;
-			mat[1][2] = v2.z;
-			mat[1][3] = 0;
-			mat[2][0] = cross.x;
-			mat[2][1] = cross.y;
-			mat[2][2] = cross.z;
-			mat[2][3] = 0;
-			mat[3][0] = 0;
-            mat[3][1] = 0;
-            mat[3][2] = 0;
-            mat[3][3] = 1;
+                v2.normalize();
+                v1.normalize();
 
-            delta_table[ne] =  MVector( delta  * mat.inverse());
+                cross = v1 ^ v2;
+                v2 = cross ^ v1;
+
+                mat = MMatrix();
+                mat[0][0] = v1.x;
+                mat[0][1] = v1.y;
+                mat[0][2] = v1.z;
+                mat[0][3] = 0;
+                mat[1][0] = v2.x;
+                mat[1][1] = v2.y;
+                mat[1][2] = v2.z;
+                mat[1][3] = 0;
+                mat[2][0] = cross.x;
+                mat[2][1] = cross.y;
+                mat[2][2] = cross.z;
+                mat[2][3] = 0;
+                mat[3][0] = 0;
+                mat[3][1] = 0;
+                mat[3][2] = 0;
+                mat[3][3] = 1;
+
+                delta_table[ne] =  MVector( delta  * mat.inverse());
 
             }
         }

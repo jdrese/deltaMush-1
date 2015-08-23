@@ -3,6 +3,8 @@
 #include <maya/MObject.h>
 #include <maya/MFnMesh.h>
 #include <maya/MItMeshVertex.h>
+#include <maya/MMatrix.h>
+#include <tbb/parallel_for.h>
 
 const int DeltaMushOpencl::MAX_NEIGH = 4;
 
@@ -35,66 +37,31 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     )
 {
     cl_int err = CL_SUCCESS;    
-    
+    MPxGPUDeformer::DeformerStatus dstatus; 
     // Setup OpenCL kernel.
     if ( !fKernel.get() )
     {
-        // Get and compile the kernel.
-        MString openCLKernelName("AverageOpencl");
-        MString openCLKernelNameTan("TangentSpaceOpencl");
-        MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
-        MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelName );
-        tangent_kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelNameTan);
-
-        if ( kernel.isNull() )
+        //opencl boiler plate to setup the kernel
+        dstatus = setup_kernel(block, numElements);
+        if (dstatus == kDeformerFailure)
         {
-            return MPxGPUDeformer::kDeformerFailure;
-        }
-        fKernel = kernel;
-        
-        if ( tangent_kernel.isNull() )
-        {
-            std::cout<<"error getting second kernel from file"<<std::endl;
-            return MPxGPUDeformer::kDeformerFailure;
-        }
-        
-        
-        // Figure out a good work group size for our kernel.
-        fLocalWorkSize = 0;
-        fGlobalWorkSize = 0;
-        size_t retSize = 0;
-        err = clGetKernelWorkGroupInfo(
-            fKernel.get(),
-            MOpenCLInfo::getOpenCLDeviceId(),
-            CL_KERNEL_WORK_GROUP_SIZE,
-            sizeof(size_t),
-            &fLocalWorkSize,
-            &retSize
-            );
-
-        MOpenCLInfo::checkCLErrorStatus(err);
-        if ( err != CL_SUCCESS || retSize == 0 || fLocalWorkSize == 0)
-        {
-            return MPxGPUDeformer::kDeformerFailure;
-        }
-        // Global work size must be a multiple of local work size.
-        const size_t remain = numElements % fLocalWorkSize;
-        if ( remain )
-        {
-            fGlobalWorkSize = numElements + ( fLocalWorkSize - remain );
-        }
-        else
-        {
-    
-            fGlobalWorkSize = numElements;
+            return dstatus;
         }
         //init data builds the neighbour table and we are going to upload it
         MObject referenceMeshV = block.inputValue(DeltaMush::referenceMesh).data();
-        initData(referenceMeshV);
+        //HARDCODED
+        int size = numElements;
+        m_size = size;
+        neigh_table.resize(size *MAX_NEIGH);
+        delta_table.resize(size *MAX_NEIGH);
+        delta_size.resize(size );
+        rebindData(referenceMeshV, 20,0.5);
         //creation and upload
         cl_int clStatus;
         d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
                                        m_size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);               
+        d_delta_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
+                                       3*m_size*sizeof(float)*MAX_NEIGH, delta_table.data(),&clStatus);               
         MOpenCLInfo::checkCLErrorStatus(clStatus);    
     }
     // Set up our input events.  The input event could be NULL, in that case we need to pass
@@ -138,11 +105,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
                 events ,
                 temp.getReferenceForAssignment() 
                 );
-        
-        //temp.getReferenceForAssignment() 
-
-        //outputEvent.getReferenceForAssignment()
-
         MOpenCLInfo::checkCLErrorStatus(err);
     }
     
@@ -172,9 +134,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
 
                 );
         
-        //temp.getReferenceForAssignment() 
-
-        //
         MOpenCLInfo::checkCLErrorStatus(err);
 
     if ( err != CL_SUCCESS )
@@ -183,53 +142,198 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     }
     return MPxGPUDeformer::kDeformerSuccess;
 }
-
-void DeltaMushOpencl::initData(
-    			 MObject &mesh)
+void DeltaMushOpencl::rebindData(		MObject &mesh,
+									int iter,
+									double amount
+								)
+{
+	initData(mesh );
+	MPointArray posRev,back,original;
+	MFnMesh meshFn(mesh);
+	//building all the arrays
+    meshFn.getPoints(posRev, MSpace::kObject);
+    back.copy(posRev);
+    original.copy(posRev);
+    
+    //getting ready to kick the parallel kernel 
+    int size = posRev.length();
+    MPointArray * srcR = &back;
+    MPointArray * trgR= &posRev;
+    int it =0;
+    for (it = 0; it < iter; it++)
+    {
+        swap(srcR, trgR);
+        Average_tbb kernel(srcR, trgR, iter, amount, neigh_table);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
+    }
+	computeDelta(original,(*trgR));
+}
+void DeltaMushOpencl::initData( MObject &mesh)
 {
 	MFnMesh meshFn(mesh);
 	int size = meshFn.numVertices();
     m_size = size;
     neigh_table.resize(size * MAX_NEIGH);
-	MPointArray pos,res;
 	MItMeshVertex iter(mesh);
 	iter.reset();
-	//meshFn.getPoints(pos , MSpace::kWorld);
 	
     MIntArray neig_tmp;
     int nsize;
-	for (int i = 0; i < size; i++,iter.next())
-	{
-		//point_data pt;
-		iter.getConnectedVertices(neig_tmp);	
-		nsize = neig_tmp.length();
-		//dataPoints[i] = pt;
+    //looping all the vertices
+    for (int i = 0; i < size; i++,iter.next())
+    {
+        //getting neighbours and their size
+        iter.getConnectedVertices(neig_tmp);	
+        nsize = neig_tmp.length();
+        //if we have more or exactly MAX_NEIGH we flatten the loop
+        //and manually put the neighbours indexes in the datastructure
         if (nsize>=MAX_NEIGH)
         {
-           neigh_table[i*MAX_NEIGH] = neig_tmp[0];
-           neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
-           neigh_table[(i*MAX_NEIGH)+2] = neig_tmp[2];
-           neigh_table[(i*MAX_NEIGH)+3] = neig_tmp[3];
+            neigh_table[i*MAX_NEIGH] = neig_tmp[0];
+            neigh_table[(i*MAX_NEIGH)+1] = neig_tmp[1];
+            neigh_table[(i*MAX_NEIGH)+2] = neig_tmp[2];
+            neigh_table[(i*MAX_NEIGH)+3] = neig_tmp[3];
         } 
+        //if not we act differently
         else
         {
+            //looping the vertices
             for (int n =0; n<MAX_NEIGH;n++)
             {
-               if(n<nsize)
-               {
-                    neigh_table[(i*MAX_NEIGH)+n] = neig_tmp[n];
-               } 
-               else
+                //if n is a valid neighbours we set it otherwise we set again the first neighbour
+                //this might need to be fixed in the case we need to set multiple neight in the 
+                //else we will end up with matching neighbours, might have to track and bumb and 
+                //cycle the index
+                if(n<nsize)
                 {
-                    //neigh_table[(i*MAX_NEIGH)+n] = -1;
+                    neigh_table[(i*MAX_NEIGH)+n] = neig_tmp[n];
+                } 
+                else
+                {
                     neigh_table[(i*MAX_NEIGH)+n] = neigh_table[(i*MAX_NEIGH)];
                 }
+            } //for (int n =0; n<MAX_NEIGH;n++)
+        }// if (nsize>=MAX_NEIGH) else
+    }// for (int i = 0; i < size; i++,iter.next())
+}
+void DeltaMushOpencl::computeDelta(MPointArray& source ,
+					   MPointArray& target)
+{
+	int size = source.length();
+	MVectorArray arr;
+	MVector delta , v1 , v2 , cross;
+	int i , n,ne ;
+	MMatrix mat;
+	//build the matrix
+	for ( i = 0 ; i < size ; i++)
+	{
+		
+		delta = MVector ( source[i] - target[i] );
+		delta_size[i] = delta.length();
+		//get tangent matrices
+		for (n = 0; n<MAX_NEIGH-1; n++)
+		{
+                    ne = i*MAX_NEIGH + n; 
+                    
+                    if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
+                    {
+			v1 = target[ neigh_table[ne] ] - target[i] ;
+			v2 = target[ neigh_table[ne+1] ] - target[i] ;
+					 
+			v2.normalize();
+			v1.normalize();
+
+			cross = v1 ^ v2;
+			v2 = cross ^ v1;
+
+			mat = MMatrix();
+			mat[0][0] = v1.x;
+			mat[0][1] = v1.y;
+			mat[0][2] = v1.z;
+			mat[0][3] = 0;
+			mat[1][0] = v2.x;
+			mat[1][1] = v2.y;
+			mat[1][2] = v2.z;
+			mat[1][3] = 0;
+			mat[2][0] = cross.x;
+			mat[2][1] = cross.y;
+			mat[2][2] = cross.z;
+			mat[2][3] = 0;
+			mat[3][0] = 0;
+            mat[3][1] = 0;
+            mat[3][2] = 0;
+            mat[3][3] = 1;
+
+            delta_table[ne] =  MVector( delta  * mat.inverse());
+
             }
         }
-	}
+    }
 }
+
+MPxGPUDeformer::DeformerStatus DeltaMushOpencl::setup_kernel(MDataBlock& block, int numElements)
+{
+    cl_int err = CL_SUCCESS;    
+
+    // Get and compile the kernel.
+    MString openCLKernelName("AverageOpencl");
+    MString openCLKernelNameTan("TangentSpaceOpencl");
+    MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
+    MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelName );
+    tangent_kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelNameTan);
+
+    if ( kernel.isNull() )
+    {
+        return MPxGPUDeformer::kDeformerFailure;
+    }
+    fKernel = kernel;
+
+    if ( tangent_kernel.isNull() )
+    {
+        std::cout<<"error getting second kernel from file"<<std::endl;
+        return MPxGPUDeformer::kDeformerFailure;
+    }
+
+
+    // Figure out a good work group size for our kernel.
+    fLocalWorkSize = 0;
+    fGlobalWorkSize = 0;
+    size_t retSize = 0;
+    err = clGetKernelWorkGroupInfo(
+            fKernel.get(),
+            MOpenCLInfo::getOpenCLDeviceId(),
+            CL_KERNEL_WORK_GROUP_SIZE,
+            sizeof(size_t),
+            &fLocalWorkSize,
+            &retSize
+            );
+
+    MOpenCLInfo::checkCLErrorStatus(err);
+    if ( err != CL_SUCCESS || retSize == 0 || fLocalWorkSize == 0)
+    {
+        return MPxGPUDeformer::kDeformerFailure;
+    }
+    // Global work size must be a multiple of local work size.
+    const size_t remain = numElements % fLocalWorkSize;
+    if ( remain )
+    {
+        fGlobalWorkSize = numElements + ( fLocalWorkSize - remain );
+    }
+    else
+    {
+        fGlobalWorkSize = numElements;
+    }
+
+    return MPxGPUDeformer::kDeformerSuccess; 
+
+}
+
 void DeltaMushOpencl::terminate()
 {
+    cl_int err = CL_SUCCESS;    
+    err= clReleaseMemObject(d_neig_table);
+    MOpenCLInfo::checkCLErrorStatus(err);
     MOpenCLInfo::releaseOpenCLKernel(fKernel);
+
     fKernel.reset();
 }
