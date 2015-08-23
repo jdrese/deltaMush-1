@@ -28,6 +28,7 @@ __kernel void AverageOpencl(
 
 __kernel void TangentSpaceOpencl(
     __global float* finalPos ,
+    __global float* d_delta_table,
     __global int * d_neig_table,
     __global const float* initialPos ,
     const uint positionCount
