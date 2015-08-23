@@ -56,15 +56,17 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         delta_table.resize(size *MAX_NEIGH);
         delta_size.resize(size );
         gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
-        rebindData(referenceMeshV, 21,1.0);
+        rebindData(referenceMeshV, 20,1.0);
         //creation and upload
         cl_int clStatus;
         d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
                                        m_size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);               
         d_delta_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
                                        (size *3*(MAX_NEIGH-1)*sizeof(float)), gpu_delta_table.data(),&clStatus);                   
+        d_primary=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
+                                       size*sizeof(float)*3, NULL,&clStatus);  
         d_secondary =  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
-                                       size*sizeof(float)*MAX_NEIGH, NULL,&clStatus);  
+                                       size*sizeof(float)*3, NULL,&clStatus);  
         d_delta_size=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
                                        size*sizeof(float)*MAX_NEIGH, delta_size.data(),&clStatus);  
         MOpenCLInfo::checkCLErrorStatus(clStatus);    
@@ -78,16 +80,20 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     //{
     //    events[ eventCount++ ] = inputEvent.get();
     //}
-    void * src =(void*)&d_secondary;
+    void * src =(void*)&d_primary;
     void * trg =(void*)inputBuffer.getReadOnlyRef(); 
     std::vector<cl_event> events_v;
     cl_event custom; 
     
-    for (int i=0; i<21; i++)
+    for (int i=0; i<20; i++)
     {
         // Set all of our kernel parameters.  Input buffer and output buffer may be changing every frame
         // so always set them.
         swap(src,trg);
+        if (i == 1)
+        {
+           trg = (void*) &d_secondary;
+        }
         cl_event curr;
         int ii = i; 
         unsigned int parameterId = 0;
