@@ -56,7 +56,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         delta_table.resize(size *MAX_NEIGH);
         delta_size.resize(size );
         gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
-        rebindData(referenceMeshV, 20,1.0);
+        rebindData(referenceMeshV, 21,1.0);
         //creation and upload
         cl_int clStatus;
         d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
@@ -81,17 +81,15 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     void * src =(void*)&d_secondary;
     void * trg =(void*)inputBuffer.getReadOnlyRef(); 
     std::vector<cl_event> events_v;
-    events_v.resize(20 +1);
+    cl_event custom; 
     
-    events_v[0] = cl_event (NULL);
-    
-    for (int i=0; i<20; i++)
+    for (int i=0; i<21; i++)
     {
         // Set all of our kernel parameters.  Input buffer and output buffer may be changing every frame
         // so always set them.
         swap(src,trg);
         cl_event curr;
-        
+        int ii = i; 
         unsigned int parameterId = 0;
         err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), trg);
         MOpenCLInfo::checkCLErrorStatus(err);
@@ -99,6 +97,8 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), src);
         MOpenCLInfo::checkCLErrorStatus(err);
+        err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_uint), (void*)&ii);
+        MOpenCLInfo::checkCLErrorStatus(err);   
         err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_uint), (void*)&numElements);
         MOpenCLInfo::checkCLErrorStatus(err);   
 
@@ -117,9 +117,14 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
                 );
         clWaitForEvents(1,&curr);
         MOpenCLInfo::checkCLErrorStatus(err);
+        if(i==20)
+        {
+            custom = curr;
+        }
     }
-     
-    //clWaitForEvents(1,temp.getReferenceForAssignment());
+    cl_int sync= clFinish (MOpenCLInfo::getOpenCLCommandQueue());
+    std::cout<<(sync == CL_SUCCESS)<<std::endl;
+    //clWaitForEvents(1,&custom);
     //calling tangent space kernel
     //
     /*
@@ -132,6 +137,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         }
     }    
     */
+
     unsigned int parameterId = 0;
     err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), outputBuffer.getReadOnlyRef());
     MOpenCLInfo::checkCLErrorStatus(err);
@@ -154,8 +160,8 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             NULL ,
             &fGlobalWorkSize ,
             &fLocalWorkSize ,
-            0 ,
-            NULL ,
+            1 ,
+            &custom ,
             outputEvent.getReferenceForAssignment()
 
             );

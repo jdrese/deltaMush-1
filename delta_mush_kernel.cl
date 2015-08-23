@@ -30,6 +30,7 @@ __kernel void AverageOpencl(
     __global float* finalPos ,
     __global int * d_neig_table,
     __global const float* initialPos ,
+    const uint iter ,
     const uint positionCount
     )
 {
@@ -50,6 +51,10 @@ __kernel void AverageOpencl(
     v.x *= FOUR_INV;
     v.y *= FOUR_INV;
     v.z *= FOUR_INV;
+    if(iter ==19 && positionId == 4102)
+    {
+        printf("v %f %f %f \n",v.x,v.y, v.z);
+    }
     vstore3( v, positionId , finalPos );
 }
 
