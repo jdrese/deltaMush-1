@@ -55,13 +55,15 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         neigh_table.resize(size *MAX_NEIGH);
         delta_table.resize(size *MAX_NEIGH);
         delta_size.resize(size );
+        gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
         rebindData(referenceMeshV, 20,0.5);
         //creation and upload
         cl_int clStatus;
         d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
                                        m_size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);               
         d_delta_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                                       9*m_size*sizeof(float)*MAX_NEIGH, delta_table.data(),&clStatus);               
+                                       (size *3*(MAX_NEIGH-1)*sizeof(float)), gpu_delta_table.data(),&clStatus);                   d_secondary =  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
+                                       m_size*sizeof(float)*MAX_NEIGH, NULL,&clStatus);  
         MOpenCLInfo::checkCLErrorStatus(clStatus);    
     }
     // Set up our input events.  The input event could be NULL, in that case we need to pass
@@ -73,7 +75,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     {
         events[ eventCount++ ] = inputEvent.get();
     }
-    void * src =(void*)outputBuffer.getReadOnlyRef();
+    void * src =(void*)&d_secondary;
     void * trg =(void*)inputBuffer.getReadOnlyRef(); 
     
     for (int i=0; i<20; i++)
@@ -111,13 +113,13 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     //calling tangent space kernel
     //
     unsigned int parameterId = 0;
-    err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), trg);
+    err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), outputBuffer.getReadOnlyRef());
     MOpenCLInfo::checkCLErrorStatus(err);
     err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_delta_table);
     MOpenCLInfo::checkCLErrorStatus(err);
     err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_neig_table);
     MOpenCLInfo::checkCLErrorStatus(err);
-    err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), src);
+    err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), trg);
     MOpenCLInfo::checkCLErrorStatus(err);
     err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_uint), (void*)&numElements);
     MOpenCLInfo::checkCLErrorStatus(err);
@@ -224,7 +226,7 @@ void DeltaMushOpencl::computeDelta(MPointArray& source ,
 	int size = source.length();
 	MVectorArray arr;
 	MVector delta , v1 , v2 , cross;
-	int i , n,ne ;
+	int i , n,ne,gpu_id ;
 	MMatrix mat;
 	//build the matrix
 	for ( i = 0 ; i < size ; i++)
@@ -268,6 +270,10 @@ void DeltaMushOpencl::computeDelta(MPointArray& source ,
 
             delta_table[ne] =  MVector( delta  * mat.inverse());
 
+            gpu_id = i*9 + n*3; 
+            gpu_delta_table[gpu_id] = delta_table[ne][0];
+            gpu_delta_table[gpu_id+1] = delta_table[ne][1];
+            gpu_delta_table[gpu_id+2] = delta_table[ne][2];
             }
         }
     }
@@ -335,8 +341,8 @@ void DeltaMushOpencl::terminate()
     cl_int err = CL_SUCCESS;    
     err= clReleaseMemObject(d_neig_table);
     MOpenCLInfo::checkCLErrorStatus(err);
-    err= clReleaseMemObject(d_delta_table);
-    MOpenCLInfo::checkCLErrorStatus(err);
+    //err= clReleaseMemObject(d_delta_table);
+    //MOpenCLInfo::checkCLErrorStatus(err);
     
     MOpenCLInfo::releaseOpenCLKernel(fKernel);
     fKernel.reset();

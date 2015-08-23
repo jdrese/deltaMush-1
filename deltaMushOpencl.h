@@ -41,8 +41,10 @@ private:
     //cl buffers
     cl_mem d_neig_table;
     cl_mem d_delta_table;
+    cl_mem d_secondary;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
+    std::vector<float> gpu_delta_table;
     std::vector<float> delta_size;
 };
 
