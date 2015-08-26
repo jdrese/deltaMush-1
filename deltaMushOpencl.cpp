@@ -5,7 +5,7 @@
 #include <maya/MItMeshVertex.h>
 #include <maya/MMatrix.h>
 #include <tbb/parallel_for.h>
-
+MString DeltaMushOpencl::pluginLoadPath;
 const int DeltaMushOpencl::MAX_NEIGH = 4;
 #define SMALL (float)1e-6
 
@@ -312,9 +312,13 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::setup_kernel(MDataBlock& block, 
     cl_int err = CL_SUCCESS;    
 
     // Get and compile the kernel.
+
+    MString openCLKernelFile(pluginLoadPath);
+    openCLKernelFile += "/delta_mush_kernel.cl";
+    std::cout<<"###########-----------------__##############"<<openCLKernelFile<<std::endl;
     MString openCLKernelName("AverageOpencl");
     MString openCLKernelNameTan("TangentSpaceOpencl");
-    MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
+    //MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
     MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelName );
     tangent_kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelNameTan);
 

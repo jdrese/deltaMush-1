@@ -31,6 +31,8 @@ public:
 					   MPointArray& target);
     void rebindData(MObject &mesh, int iter, double amount);
     static const int MAX_NEIGH;
+    static MString pluginLoadPath;
+
 private:
     // Kernel
     MAutoCLKernel fKernel;

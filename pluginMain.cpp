@@ -20,6 +20,7 @@ MStatus initializePlugin( MObject obj )
             registrantId,
             DeltaMushOpencl::getGPUDeformerInfo()
             );
+    DeltaMushOpencl::pluginLoadPath = plugin.loadPath();
     return status;
 }
  
