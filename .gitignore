@@ -26,3 +26,16 @@
 *.exe
 *.out
 *.app
+
+# Misc
+*.log21:34 26/08/2015
+*.ipch
+*.pdb
+*.manifest
+*.cache
+*.rc
+*.*log
+*.exp
+*.ilk
+*.lastbuildstate
+*.opensdf
