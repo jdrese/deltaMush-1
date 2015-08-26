@@ -17,10 +17,11 @@
 #include <maya/MFnFloatArrayData.h>
 
 #include <tbb/parallel_for.h>
-
+#include <chrono>
 #define SMALL (float)1e-6
 
-
+using namespace std;
+using namespace std::chrono;
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const unsigned int DeltaMush::MAX_NEIGH =4;
@@ -58,6 +59,10 @@ DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automa
 //DeltaMush::DeltaMush():initialized(false), init(20)
 {
 	targetPos.setLength(0);
+    #if PROFILE
+    counter =0;
+    total =0;
+    #endif
 }
 
 //creator funtion
@@ -136,7 +141,9 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
 						const MMatrix& localToWorldMatrix, 
 						unsigned int mIndex )
 {	
-	
+    #if PROFILE ==1
+    auto t1 = high_resolution_clock::now();
+    #endif
 	//Preliminary check :
 	//Check if the ref mesh is connected
 	double envelopeV = data.inputValue(envelope).asFloat();
@@ -202,7 +209,19 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         }
 
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
+    #if PROFILE==1
+	auto t2 = high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
+    total += duration;
+    counter +=1;
+    if (counter >= 100)
+    {
+        std::cout<<"all deformer: "<<(total/100000.0f)<<" ms"<<std::endl; 
+        counter =0;
+        total =0;
+    }
 
+    #endif
     return MStatus::kSuccess ; 
 }
 
@@ -225,8 +244,7 @@ void Average_tbb::operator()( const tbb::blocked_range<size_t>& r) const
         for (n = 0; n<DeltaMush::MAX_NEIGH; n++)
         {
             ne = neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
-            //need to work on this if, find a way to remove it
-                temp += (*source)[ne];					
+            temp += (*source)[ne];					
         }
         temp/= DeltaMush::MAX_NEIGH;
         (*target)[i] =(*source)[i] +  (temp - (*source)[i] )*amountV;

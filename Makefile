@@ -23,13 +23,14 @@ endif
 #defining source directory needed by build config
 SRCDIR=.
 
-BUILD := release
+BUILD ?= release
+PROFILE?= 1 
 ifeq ($(BUILD),debug)
 C++FLAGS += -g
 endif
 
 #adding custom flags
-C++FLAGS += -funroll-loops -msse4 -DMaya$(mayaVersion)
+C++FLAGS += -funroll-loops -msse4 -DMaya$(mayaVersion) -DPROFILE=$(PROFILE)
 
 #extra flags for maya 2016
 ifeq ($(mayaVersion),2016)

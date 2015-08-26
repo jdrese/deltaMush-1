@@ -65,7 +65,11 @@ private :
     std::vector<MVector> delta_table;
     std::vector<float> delta_size;
     tbb::task_scheduler_init init;
-	
+    
+    #if PROFILE==1
+    int counter;    
+    float total;
+    #endif
     bool initialized;
 
 };
