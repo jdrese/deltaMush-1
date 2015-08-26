@@ -15,7 +15,7 @@ MGPUDeformerRegistrationInfo* DeltaMushOpencl::getGPUDeformerInfo()
     return &theOne;
 }
 DeltaMushOpencl::DeltaMushOpencl()
-{
+{std::cout<<"###########-----------------__##############"<<pluginLoadPath<<std::endl;
 }
 DeltaMushOpencl::~DeltaMushOpencl()
 {
@@ -78,15 +78,22 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             //creation and upload
             cl_int clStatus;
             d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                    size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);               
+                    size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);
+			MOpenCLInfo::checkCLErrorStatus(clStatus);  
             d_delta_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                    (3*size*(MAX_NEIGH-1)*sizeof(float)), gpu_delta_table.data(),&clStatus);                   
+                    (3*size*(MAX_NEIGH-1)*sizeof(float)), gpu_delta_table.data(),&clStatus);
+			MOpenCLInfo::checkCLErrorStatus(clStatus);  
             d_primary=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
-                    3*size*sizeof(float), NULL,&clStatus);  
+                    3*size*sizeof(float), NULL,&clStatus);
+			MOpenCLInfo::checkCLErrorStatus(clStatus);  
             d_secondary =  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
-                    3*size*sizeof(float), NULL,&clStatus);  
+                    3*size*sizeof(float), NULL,&clStatus);
+			MOpenCLInfo::checkCLErrorStatus(clStatus);  
+			int size3 = 3*MAX_NEIGH;
+			int size2 = delta_size.size();
             d_delta_size=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                    size*sizeof(float)*MAX_NEIGH, delta_size.data(),&clStatus);  
+                    size*sizeof(float), delta_size.data(),&clStatus);  
+
             MOpenCLInfo::checkCLErrorStatus(clStatus);    
         }
         // Set up our input events.  The input event could be NULL, in that case we need to pass
