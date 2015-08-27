@@ -76,12 +76,6 @@ __kernel void TangentSpaceOpencl(
     float3 v0,v1,v2,crossV,delta,deltaRef;
     unsigned int id; 
     v0 = vload3(positionId,initialPos);
-    /*
-    if (positionId ==3379)
-    {
-        printf("as position v0 %f %f %f \n",v0.x,v0.y, v0.z);
-    }
-    */
     
     for (unsigned int i=0; i<3;i++)
     {
@@ -92,17 +86,6 @@ __kernel void TangentSpaceOpencl(
         
         id = d_neig_table[positionId*4 +i+1];  
         v2 = vload3(id, initialPos);
-        if (positionId ==4055 && i==2)
-        {
-            printf("id %i \n", id);
-            //printf("deltaref  %f %f %f \n",deltaRef.x,deltaRef.y, deltaRef.z);
-            //printf("v1 %f %f %f \n",v1.x,v1.y, v1.z);
-            printf("v2 %f %f %f \n",v2.x,v2.y, v2.z);
-            //printf("cross %f %f %f \n",crossV.x,crossV.y, crossV.z);
-            //printf("accum %f %f %f \n",accum.x,accum.y, accum.z);
-            //printf("delta %f %f %f \n",delta.x,delta.y, delta.z);
-            
-        }
         
          
         v1 -= v0;
@@ -122,20 +105,8 @@ __kernel void TangentSpaceOpencl(
         delta = mat3_vec3_mult(v1, v2, crossV, deltaRef);
         accum += delta;
     } 
-    /*
-    if(positionId == 4055)
-    {
-        printf("delta %f \n",d_delta_size[positionId]);
-        printf("accum %f %f %f \n",accum.x,accum.y, accum.z);
-    }*/
     accum = vec_norm(accum) ; 
     
-    /*
-    if(positionId == 4055)
-    {    
-        printf("accum norm%f %f %f \n",accum.x,accum.y, accum.z);
-    }
-    */
     accum *=  d_delta_size[positionId];
     accum += v0;
     vstore3( accum, positionId , finalPos );
