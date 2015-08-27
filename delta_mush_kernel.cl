@@ -77,7 +77,6 @@ __kernel void TangentSpaceOpencl(
     unsigned int id; 
     v0 = vload3(positionId,initialPos);
     
-    
     for (unsigned int i=0; i<3;i++)
     {
         id = d_neig_table[(positionId*4) +i];  
@@ -87,7 +86,7 @@ __kernel void TangentSpaceOpencl(
         
         id = d_neig_table[positionId*4 +i+1];  
         v2 = vload3(id, initialPos);
-  
+
         v1 -= v0;
         v2 -= v0;
         v1 = normalize(v1);
@@ -105,8 +104,7 @@ __kernel void TangentSpaceOpencl(
         delta = mat3_vec3_mult(v1, v2, crossV, deltaRef);
         accum += delta;
     } 
-   
-    accum = vec_norm(accum) ; 
+    accum = vec_norm(accum); 
     accum *=  d_delta_size[positionId];
     accum += v0;
     vstore3( accum, positionId , finalPos );

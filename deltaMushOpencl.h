@@ -41,11 +41,14 @@ private:
     size_t fGlobalWorkSize;
     int m_size; 
     //cl buffers
-    cl_mem d_neig_table;
-    cl_mem d_delta_table;
-    cl_mem d_delta_size;
+    //cl_mem d_neig_table;
+    //cl_mem d_delta_table;
+    //cl_mem d_delta_size;
     cl_mem d_primary;
     cl_mem d_secondary;
+    MAutoCLMem d_neig_table;
+    MAutoCLMem d_delta_size;
+    MAutoCLMem d_delta_table;
     std::vector<int> neigh_table;
     std::vector<MVector> delta_table;
     std::vector<float> gpu_delta_table;

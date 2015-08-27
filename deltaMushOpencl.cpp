@@ -61,6 +61,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             {
                 return dstatus;
             }
+            std::cout<<"kernel setup done"<<std::endl;
             //init data builds the neighbour table and we are going to upload it
             MObject referenceMeshV = block.inputValue(DeltaMush::referenceMesh).data();
             //HARDCODED
@@ -72,25 +73,28 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             gpu_delta_table.resize(size *3*(MAX_NEIGH-1));
             rebindData(referenceMeshV, iterationsV,amountV);
             
+            std::cout<<"reding attributes done"<<std::endl;
             //creation and upload
             cl_int clStatus;
-            d_neig_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                    size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus);
-			MOpenCLInfo::checkCLErrorStatus(clStatus);  
-            d_delta_table = clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                    (3*size*(MAX_NEIGH-1)*sizeof(float)), gpu_delta_table.data(),&clStatus);
-			MOpenCLInfo::checkCLErrorStatus(clStatus);  
-            d_primary=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
-                    3*size*sizeof(float), NULL,&clStatus);
-			MOpenCLInfo::checkCLErrorStatus(clStatus);  
-            d_secondary =  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
-                    3*size*sizeof(float), NULL,&clStatus);
-			MOpenCLInfo::checkCLErrorStatus(clStatus);  
-			int size3 = 3*MAX_NEIGH;
-			int size2 = delta_size.size();
-            d_delta_size=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
-                    size*sizeof(float), delta_size.data(),&clStatus);  
 
+            d_neig_table.attach(clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
+                    size*sizeof(int)*MAX_NEIGH, neigh_table.data(),&clStatus));               
+            MOpenCLInfo::checkCLErrorStatus(clStatus);    
+            
+            d_delta_table.attach(clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
+                    (3*size*(MAX_NEIGH-1)*sizeof(float)), gpu_delta_table.data(),&clStatus));                   
+            MOpenCLInfo::checkCLErrorStatus(clStatus);    
+            
+            d_primary=  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
+                    MAX_NEIGH*size*sizeof(float), NULL,&clStatus);  
+            MOpenCLInfo::checkCLErrorStatus(clStatus);    
+            
+            d_secondary =  clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_READ_ONLY,
+                    MAX_NEIGH*size*sizeof(float), NULL,&clStatus);  
+            MOpenCLInfo::checkCLErrorStatus(clStatus);    
+            
+            d_delta_size.attach(clCreateBuffer(MOpenCLInfo::getOpenCLContext(), CL_MEM_COPY_HOST_PTR|CL_MEM_READ_ONLY,
+                    size*sizeof(float), delta_size.data(),&clStatus));  
             MOpenCLInfo::checkCLErrorStatus(clStatus);    
         }
         // Set up our input events.  The input event could be NULL, in that case we need to pass
@@ -112,7 +116,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             unsigned int parameterId = 0;
             err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), trg);
             MOpenCLInfo::checkCLErrorStatus(err);
-            err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_neig_table);
+            err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), d_neig_table.getReadOnlyRef());
             MOpenCLInfo::checkCLErrorStatus(err);
             err = clSetKernelArg(fKernel.get(), parameterId++, sizeof(cl_mem), src);
             MOpenCLInfo::checkCLErrorStatus(err);
@@ -139,15 +143,15 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             //clWaitForEvents(1,&curr);
             MOpenCLInfo::checkCLErrorStatus(err);
         }
-        
+         
         unsigned int parameterId = 0;
         err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), outputBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
-        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_delta_table);
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), d_delta_table.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
-        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_delta_size);
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), d_delta_size.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
-        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), (void*)&d_neig_table);
+        err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), d_neig_table.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(tangent_kernel.get(), parameterId++, sizeof(cl_mem), trg);
         MOpenCLInfo::checkCLErrorStatus(err);
@@ -175,6 +179,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
             return MPxGPUDeformer::kDeformerFailure;
         }
         
+     
     }    
         return MPxGPUDeformer::kDeformerSuccess;
 }
@@ -321,7 +326,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::setup_kernel(MDataBlock& block, 
     openCLKernelFile += "/delta_mush_kernel.cl";
     MString openCLKernelName("AverageOpencl");
     MString openCLKernelNameTan("TangentSpaceOpencl");
-    //MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
     MAutoCLKernel kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelName );
     tangent_kernel = MOpenCLInfo::getOpenCLKernel(openCLKernelFile, openCLKernelNameTan);
 
@@ -375,11 +379,16 @@ void DeltaMushOpencl::terminate()
 
     
     cl_int err = CL_SUCCESS;    
-    err= clReleaseMemObject(d_neig_table);
-    MOpenCLInfo::checkCLErrorStatus(err);
-    err= clReleaseMemObject(d_delta_table);
-    MOpenCLInfo::checkCLErrorStatus(err);
+    //err= clReleaseMemObject(d_neig_table);
+    d_neig_table.reset();
+    d_delta_size.reset();
+    d_delta_table.reset();
+    //MOpenCLInfo::checkCLErrorStatus(err);
+    //err= clReleaseMemObject(d_delta_table);
+    //MOpenCLInfo::checkCLErrorStatus(err);
     
     MOpenCLInfo::releaseOpenCLKernel(fKernel);
     fKernel.reset();
+    MOpenCLInfo::releaseOpenCLKernel(tangent_kernel);
+    tangent_kernel.reset();
 }
