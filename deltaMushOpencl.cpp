@@ -43,8 +43,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
     bool rebindV = block.inputValue(DeltaMush::rebind).asBool();
     float globalScaleV = block.inputValue( DeltaMush::globalScale).asDouble();
     
-
-    std::cout<<"AMount VALUE "<< amountV<<std::endl;
 	double envelopeV = block.inputValue(DeltaMush::envelope).asFloat();
 	int iterationsV = block.inputValue(DeltaMush::iterations).asInt();
 	
@@ -57,7 +55,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::evaluate(
         // Setup OpenCL kernel.
         if ( !fKernel.get() )
         {
-            std::cout<<"init kernel ------------------------------------------------->"<<std::endl;
             //opencl boiler plate to setup the kernel
             dstatus = setup_kernel(block, numElements);
             if (dstatus == kDeformerFailure)
@@ -322,7 +319,6 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::setup_kernel(MDataBlock& block, 
 
     MString openCLKernelFile(pluginLoadPath);
     openCLKernelFile += "/delta_mush_kernel.cl";
-    std::cout<<"###########-----------------__##############"<<openCLKernelFile<<std::endl;
     MString openCLKernelName("AverageOpencl");
     MString openCLKernelNameTan("TangentSpaceOpencl");
     //MString openCLKernelFile("/home/giordi/WORK_IN_PROGRESS/C/deltaMush/delta_mush_kernel.cl");
@@ -376,7 +372,7 @@ MPxGPUDeformer::DeformerStatus DeltaMushOpencl::setup_kernel(MDataBlock& block, 
 
 void DeltaMushOpencl::terminate()
 {
-    std::cout<<"DESTRUCTOOOOOOOOOOOOOR #####################################"<<std::endl;
+
     
     cl_int err = CL_SUCCESS;    
     err= clReleaseMemObject(d_neig_table);
