@@ -268,7 +268,11 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
 
                 cross = v1 ^ v2;
                 v2 = cross ^ v1;
-
+                
+                //I really REALLY hate this, I wish to see if there is some optimization can be done
+                //here, even VTune shows this to be quite a slow passage, i have some ides in mind like,
+                //try to hack my way in with memcpy etc, but it would be a hack and would be just for the love
+                //of performance and not rock solid code
                 mat = MMatrix();
                 mat[0][0] = v1.x;
                 mat[0][1] = v1.y;
