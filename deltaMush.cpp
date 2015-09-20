@@ -35,26 +35,6 @@ MObject DeltaMush::amount;
 MObject DeltaMush::mapMult;
 MObject DeltaMush::globalScale;
 
-//TODO
-//better average calculation using pointer and not deep copy X
-//avoid usage of final array and try to use final buffer X
-//check if possible to avoid normalization and do a simple average =
-//move the ifs statement that leads to return in one X 
-//reverse  if statement to make most likely choice as first to help instruction cache X
-//change neighbourood to a max of 4 so we can have a flatter array and we can unroll inner neighbour loopX
-//use data structures that are not maya (like the arrays) X
-//move variable declaration in header and move all attribute pull in pre-load / set dep dirty?
-//make average parallel X
-//make delta computation parallel X
-//make both average and delta in one parallel call with a lock? faster or not?
-//use eigen math library not maya
-//trying to enamble eigen SSE instruction or if not possible try to do some intrinsic manually?
-//if using maya matrix better way to set the value? maybe try to hack a memcpy in ?
-//worth considering data refactorying of pos n n n n pos n n n n to ensure cache friendliness? though this is just a guess
-//the data refactoring might very well be slower but having a flat buffer of neighbour might help rather then package the point with all the data
-//possible gpu?
-//sorting vertex based on neighbours bucket?
-
 DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
 //DeltaMush::DeltaMush():initialized(false), init(20)
 {
