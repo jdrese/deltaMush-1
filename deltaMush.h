@@ -170,10 +170,21 @@ struct Average_tbb
 
 };
 
-
+//this functor deforms the offest in tangent space
 struct Tangent_tbb
 {
     public:
+        /*
+         * The constructor
+         * @param source: the currently deformed mesh
+         * @param original: the original data set
+         * @param applyDeltaV: the amount of delta to apply
+         * @param globalScaleV: the value of global scale of the mesh
+         * @param envelopV: amount of the global deformed that gets applied
+         * @param wgts: the weight map for the deformer
+         * @param delta_table:  the deltas to be transformed in tangent space 
+         * @param neigh_table:  the topology table of the mes
+         */
         Tangent_tbb(MPointArray * source ,
                     MPointArray * original,
                 const double applyDeltaV,
@@ -190,15 +201,16 @@ struct Tangent_tbb
         void operator() (const tbb::blocked_range<size_t>& r)const;
 
     private:
-        MPointArray * source;
-        MPointArray * original;
-        const double applyDeltaV;
-        const double envelopeV;
-        const double globalScaleV;
-        const std::vector<float> & wgts;
-        const std::vector<float> & delta_size;
-        const std::vector<MVector> &delta_table;
-        const std::vector<int>& neigh_table;
+        //cached inputs
+        MPointArray * m_source;
+        MPointArray * m_original;
+        const double m_applyDeltaV;
+        const double m_envelopeV;
+        const double m_globalScaleV;
+        const std::vector<float>& m_wgts;
+        const std::vector<float>& m_delta_size;
+        const std::vector<MVector>& m_delta_table;
+        const std::vector<int>& m_neigh_table;
 
 };
 

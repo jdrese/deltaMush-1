@@ -274,10 +274,16 @@ Tangent_tbb::Tangent_tbb(MPointArray * source ,
                 const std::vector<float> & wgts,
                 const std::vector<float> & delta_size,
                 const std::vector<MVector> & delta_table,
-                const std::vector<int>& neigh_table): source(source), original(original),
-                                                        applyDeltaV(applyDeltaV),envelopeV(envelopeV),
-                                                      globalScaleV(globalScaleV), wgts(wgts), delta_size(delta_size),
-                                                      delta_table(delta_table), neigh_table(neigh_table)
+                const std::vector<int>& neigh_table): 
+                m_source(source), 
+                m_original(original),
+                m_applyDeltaV(applyDeltaV),
+                m_envelopeV(envelopeV),
+                m_globalScaleV(globalScaleV), 
+                m_wgts(wgts), 
+                m_delta_size(delta_size),
+                m_delta_table(delta_table), 
+                m_neigh_table(neigh_table)
 {}
 
 void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
@@ -293,8 +299,8 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
         {
             ne = i*DeltaMush::MAX_NEIGH + n; 
 
-            v1 = (*source)[ neigh_table[ne] ] -(*source)[i] ;
-            v2 = (*source)[ neigh_table [ne+1] ] -  (*source)[i] ;
+            v1 = (*m_source)[ m_neigh_table[ne] ] -(*m_source)[i] ;
+            v2 = (*m_source)[ m_neigh_table [ne+1] ] -  (*m_source)[i] ;
 
             v2.normalize();
             v1.normalize();
@@ -303,12 +309,14 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
             v2 = cross ^ v1;
 
             set_matrix_from_vecs(mat, v1, v2, cross);
-            delta += (  delta_table[ne]* mat );
+            delta += (  m_delta_table[ne] * mat );
         }
 
-        delta= delta.normal()*delta_size[i]*applyDeltaV*globalScaleV; 
-        delta = ((*source)[i]+delta) - (*original)[i];
-        (*original)[i]= (*original)[i] + (delta * wgts[i] * envelopeV);
+        //TODO (giordi) the value m_applyDeltaV * m_globalScaleV can be cached and used 
+        //rather than be recomputed, also one float only to fit in cache rather than 2
+        delta= delta.normal() * m_delta_size[i] * m_applyDeltaV * m_globalScaleV; 
+        delta = ((*m_source)[i] + delta) - (*m_original)[i];
+        (*m_original)[i]= (*m_original)[i] + (delta * m_wgts[i] * m_envelopeV);
     }
 }
 
@@ -455,7 +463,7 @@ void DeltaMush::rebindData(		MObject &mesh,
     {
         swap(srcR, trgR);
         Average_tbb kernel(srcR, trgR, iter, amount, neigh_table);
-        tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, size, 2000), kernel);
     }
 	computeDelta(original,(*trgR));
 }
