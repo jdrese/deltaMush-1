@@ -1,22 +1,16 @@
-#include "deltaMush.h"
+#include <tbb/parallel_for.h>
+
 #include <maya/MPxDeformerNode.h>
-#include <maya/MItGeometry.h>
-#include <maya/MItMeshVertex.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnTypedAttribute.h>
-#include <maya/MPoint.h>
+#include <maya/MItGeometry.h>
+#include <maya/MItMeshVertex.h>
 #include <maya/MVector.h>
 #include <maya/MFnMesh.h>
 #include <maya/MPointArray.h>
-#include <maya/MMatrix.h>
 #include <maya/MItMeshPolygon.h>
-#include <maya/MFnCompoundAttribute.h>
-#include <maya/MPlug.h>
-#include <maya/MFnDoubleArrayData.h>
-#include <maya/MArrayDataBuilder.h>
-#include <maya/MFnFloatArrayData.h>
 
-#include <tbb/parallel_for.h>
+#include "deltaMush.h"
 
 #if PROFILE ==1
 #include <chrono>
@@ -37,12 +31,15 @@ MObject DeltaMush::amount;
 MObject DeltaMush::mapMult;
 MObject DeltaMush::globalScale;
 
+//I really REALLY hate this, I wish to see if there is some optimization can be done
+//here, even VTune shows this to be quite a slow passage, i have some ides in mind like,
+//try to hack my way in with memcpy etc, but it would be a hack and would be just for the love
+//of performance and not rock solid code
 inline void set_matrix_from_vecs(MMatrix &mat,
                             MVector &v1,
                             MVector &v2,
                             MVector &v3)
 {
-
     mat = MMatrix();
     mat[0][0] = v1.x;
     mat[0][1] = v1.y;
@@ -150,6 +147,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
     #if PROFILE ==1
     auto t1 = high_resolution_clock::now();
     #endif
+
 	//Preliminary check :
 	//Check if the ref mesh is connected
 	double envelopeV = data.inputValue(envelope).asFloat();
@@ -175,19 +173,17 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
             delta_size.resize(size );
             rebindData(referenceMeshV, iterationsV,amountV);
 
-
             //read weights
             getWeights(data,size);
             initialized = true;
         }
-
         iter.allPositions(pos, MSpace::kObject);
 
         //We need to work on a copy due to the fact that we need to preserve the original position 
         //for blending afterwards 
-        
         copy.copy(pos);
-        //here we invert already the source and targets since the swap appens before computtion and not 
+        
+        //here we invert already the source and targets since the swap happens before computation and not 
         //afterwards, the reason for that is in this way we are always sure that the final result is in the 
         //target pointer
         MPointArray * srcR = &targetPos;
@@ -215,6 +211,7 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         }
 
     }// end of  if (envelopeV > SMALL && iterationsV > 0 ) 
+    
     #if PROFILE==1
 	auto t2 = high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
@@ -226,14 +223,21 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         counter =0;
         total =0;
     }
-
     #endif
+    
     return MStatus::kSuccess ; 
 }
 
 Average_tbb::Average_tbb(MPointArray * source ,
-					   MPointArray * target , int iter,
-					   double amountV, const std::vector<int>& neigh_table): source(source), target(target),iter(iter), amountV(amountV), neigh_table(neigh_table)
+					   MPointArray * target , 
+                       int iter,
+					   double amountV, 
+                       const std::vector<int>& neigh_table): 
+                       m_source(source), 
+                       m_target(target),
+                       m_iter(iter), 
+                       m_amountV(amountV), 
+                       m_neigh_table(neigh_table)
 {
     
 }
@@ -249,11 +253,15 @@ void Average_tbb::operator()( const tbb::blocked_range<size_t>& r) const
         temp = MVector(0,0,0);
         for (n = 0; n<DeltaMush::MAX_NEIGH; n++)
         {
-            ne = neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
-            temp += (*source)[ne];					
+            //here we scan the array with a stride of MAX_NEIGH since
+            //topology data is stored in a flat buffer, this is particularly
+            //good for caching exploit
+            ne = m_neigh_table[(i*DeltaMush::MAX_NEIGH) + n];
+            temp += (*m_source)[ne];					
         }
         temp/= DeltaMush::MAX_NEIGH;
-        (*target)[i] =(*source)[i] +  (temp - (*source)[i] )*amountV;
+        //linear interpolation based on amount we want to smooth per iteration
+        (*m_target)[i] =(*m_source)[i] +  (temp - (*m_source)[i] )*m_amountV;
     }
 
 }
@@ -280,37 +288,28 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
     for (i = r.begin() ; i <r.end();i++)
     {
         delta = MVector(0,0,0);
+
         for (n = 0; n< DeltaMush::MAX_NEIGH -1 ;n++)
         {
             ne = i*DeltaMush::MAX_NEIGH + n; 
 
-            //if (neigh_table[ne] != -1 && neigh_table[ne+1] != -1)
-            //{
-                v1 = (*source)[ neigh_table[ne] ] -(*source)[i] ;
-                v2 = (*source)[ neigh_table [ne+1] ] -  (*source)[i] ;
+            v1 = (*source)[ neigh_table[ne] ] -(*source)[i] ;
+            v2 = (*source)[ neigh_table [ne+1] ] -  (*source)[i] ;
 
-                v2.normalize();
-                v1.normalize();
+            v2.normalize();
+            v1.normalize();
 
-                cross = v1 ^ v2;
-                v2 = cross ^ v1;
-                
-                //I really REALLY hate this, I wish to see if there is some optimization can be done
-                //here, even VTune shows this to be quite a slow passage, i have some ides in mind like,
-                //try to hack my way in with memcpy etc, but it would be a hack and would be just for the love
-                //of performance and not rock solid code
-                set_matrix_from_vecs(mat, v1, v2, cross);
-                delta += (  delta_table[ne]* mat );
-            //}
+            cross = v1 ^ v2;
+            v2 = cross ^ v1;
+
+            set_matrix_from_vecs(mat, v1, v2, cross);
+            delta += (  delta_table[ne]* mat );
         }
 
-        //delta= (delta/DeltaMush::MAX_NEIGH)*applyDeltaV*globalScaleV; 
         delta= delta.normal()*delta_size[i]*applyDeltaV*globalScaleV; 
         delta = ((*source)[i]+delta) - (*original)[i];
         (*original)[i]= (*original)[i] + (delta * wgts[i] * envelopeV);
     }
-
-
 }
 
 void DeltaMush::initData(
