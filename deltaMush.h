@@ -1,3 +1,5 @@
+#pragma once
+
 #include <maya/MGlobal.h>
 #include <maya/MPxDeformerNode.h>
 #include <maya/MTypeId.h> 
@@ -10,11 +12,8 @@
 #include <maya/MEvaluationNode.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/blocked_range.h>
-#ifndef _DeltaMush
-#define _DeltaMush
-
+#include <maya/MMatrix.h>
 typedef unsigned int uint;
-
 using namespace std;
 
 class DeltaMush : public MPxDeformerNode
@@ -23,11 +22,12 @@ public:
 	DeltaMush();
 	static  void*		creator();
 	static  MStatus		initialize();
-	virtual MStatus		deform(MDataBlock& data, MItGeometry& iter, const MMatrix& mat, unsigned int mIndex);
-	virtual MStatus     setDependentsDirty( const MPlug& plug, MPlugArray& plugArray );
+	MStatus		deform(MDataBlock& data, MItGeometry& iter, 
+                       const MMatrix& mat, uint mIndex) override;
+	MStatus    setDependentsDirty( const MPlug& plug, 
+                                    MPlugArray& plugArray ) override;
+
 private:
-
-
     void initData( MObject &mesh,
     				int iters );
 
@@ -39,9 +39,13 @@ private:
 						double amount
 					);
     void getWeights(MDataBlock data, int size);
+    
+
+    //maya 2016 only overriden functions
     #ifdef Maya2016
-    virtual SchedulingType schedulingType()const;
-    virtual MStatus     preEvaluation( const  MDGContext& context, const MEvaluationNode& evaluationNode );
+    SchedulingType schedulingType()const override;
+    MStatus     preEvaluation( const  MDGContext& context, 
+                                       const MEvaluationNode& evaluationNode ) override;
     #endif
 public :
 	static MTypeId		id;	
@@ -53,7 +57,7 @@ public :
 	static MObject		amount;
 	static MObject		mapMult;
     static MObject		globalScale;
-    const static unsigned int MAX_NEIGH;
+    const static uint MAX_NEIGH;
 
 private :
 	MPointArray targetPos;
@@ -73,6 +77,8 @@ private :
     bool initialized;
 
 };
+
+//TBB operators
 struct Average_tbb
 {
     public:
@@ -119,7 +125,5 @@ struct Tangent_tbb
         const std::vector<int>& neigh_table;
 
 };
-
-#endif
 
 

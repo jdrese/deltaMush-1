@@ -17,14 +17,16 @@
 #include <maya/MFnFloatArrayData.h>
 
 #include <tbb/parallel_for.h>
-#include <chrono>
-#define SMALL (float)1e-6
 
+#if PROFILE ==1
+#include <chrono>
 using namespace std;
 using namespace std::chrono;
+#endif
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
-const unsigned int DeltaMush::MAX_NEIGH =4;
+const uint DeltaMush::MAX_NEIGH =4;
+#define SMALL (float)1e-6
 
 MObject DeltaMush::rebind ;
 MObject DeltaMush::referenceMesh;
@@ -35,6 +37,30 @@ MObject DeltaMush::amount;
 MObject DeltaMush::mapMult;
 MObject DeltaMush::globalScale;
 
+inline void set_matrix_from_vecs(MMatrix &mat,
+                            MVector &v1,
+                            MVector &v2,
+                            MVector &v3)
+{
+
+    mat = MMatrix();
+    mat[0][0] = v1.x;
+    mat[0][1] = v1.y;
+    mat[0][2] = v1.z;
+    mat[0][3] = 0;
+    mat[1][0] = v2.x;
+    mat[1][1] = v2.y;
+    mat[1][2] = v2.z;
+    mat[1][3] = 0;
+    mat[2][0] = v3.x;
+    mat[2][1] = v3.y;
+    mat[2][2] = v3.z;
+    mat[2][3] = 0;
+    mat[3][0] = 0;
+    mat[3][1] = 0;
+    mat[3][2] = 0;
+    mat[3][3] = 1;
+};
 DeltaMush::DeltaMush():initialized(false), init(tbb::task_scheduler_init::automatic)
 //DeltaMush::DeltaMush():initialized(false), init(20)
 {
@@ -119,7 +145,7 @@ MStatus DeltaMush::initialize()
 
 MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter, 
 						const MMatrix& localToWorldMatrix, 
-						unsigned int mIndex )
+						uint mIndex )
 {	
     #if PROFILE ==1
     auto t1 = high_resolution_clock::now();
@@ -273,24 +299,7 @@ void Tangent_tbb::operator()( const tbb::blocked_range<size_t>& r) const
                 //here, even VTune shows this to be quite a slow passage, i have some ides in mind like,
                 //try to hack my way in with memcpy etc, but it would be a hack and would be just for the love
                 //of performance and not rock solid code
-                mat = MMatrix();
-                mat[0][0] = v1.x;
-                mat[0][1] = v1.y;
-                mat[0][2] = v1.z;
-                mat[0][3] = 0;
-                mat[1][0] = v2.x;
-                mat[1][1] = v2.y;
-                mat[1][2] = v2.z;
-                mat[1][3] = 0;
-                mat[2][0] = cross.x;
-                mat[2][1] = cross.y;
-                mat[2][2] = cross.z;
-                mat[2][3] = 0;
-                mat[3][0] = 0;
-                mat[3][1] = 0;
-                mat[3][2] = 0;
-                mat[3][3] = 1;
-
+                set_matrix_from_vecs(mat, v1, v2, cross);
                 delta += (  delta_table[ne]* mat );
             //}
         }
@@ -383,22 +392,7 @@ void DeltaMush::computeDelta(MPointArray& source ,
 			v2 = cross ^ v1;
 
 			mat = MMatrix();
-			mat[0][0] = v1.x;
-			mat[0][1] = v1.y;
-			mat[0][2] = v1.z;
-			mat[0][3] = 0;
-			mat[1][0] = v2.x;
-			mat[1][1] = v2.y;
-			mat[1][2] = v2.z;
-			mat[1][3] = 0;
-			mat[2][0] = cross.x;
-			mat[2][1] = cross.y;
-			mat[2][2] = cross.z;
-			mat[2][3] = 0;
-			mat[3][0] = 0;
-            mat[3][1] = 0;
-            mat[3][2] = 0;
-            mat[3][3] = 1;
+            set_matrix_from_vecs(mat, v1, v2, cross);
 
             delta_table[ne] =  MVector( delta  * mat.inverse());
 
@@ -412,6 +406,7 @@ void DeltaMush::getWeights(MDataBlock data, int size)
     MArrayDataHandle inWeightH = data.inputArrayValue(weightList);
     int c = inWeightH.elementCount(); 
     wgts.resize(size);
+
     //if there is no map we initialize it to 1.0
     if (c>0)
     { 
