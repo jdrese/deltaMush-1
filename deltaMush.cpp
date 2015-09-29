@@ -20,6 +20,7 @@ using namespace std::chrono;
 
 MTypeId     DeltaMush::id( 0x0011FF83); 
 const uint DeltaMush::MAX_NEIGH =4;
+const uint DeltaMush::GRAIN_SIZE= 2000;
 #define SMALL (float)1e-6
 
 MObject DeltaMush::rebind ;
@@ -193,14 +194,14 @@ MStatus DeltaMush::deform( MDataBlock& data, MItGeometry& iter,
         {
             swap(srcR, trgR);
             Average_tbb kernel(srcR, trgR, iterationsV ,amountV, neigh_table);
-            tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernel);
+            tbb::parallel_for(tbb::blocked_range<size_t>(0,size,DeltaMush::GRAIN_SIZE), kernel);
         }
         
         if (applyDeltaV >= SMALL )
         {
             Tangent_tbb kernelT (trgR,&pos, applyDeltaV, globalScaleV, envelopeV,
                             wgts, delta_size, delta_table, neigh_table);
-            tbb::parallel_for(tbb::blocked_range<size_t>(0,size,2000), kernelT);
+            tbb::parallel_for(tbb::blocked_range<size_t>(0,size, DeltaMush::GRAIN_SIZE), kernelT);
 
             iter.setAllPositions(pos);
 
@@ -463,7 +464,7 @@ void DeltaMush::rebindData(		MObject &mesh,
     {
         swap(srcR, trgR);
         Average_tbb kernel(srcR, trgR, iter, amount, neigh_table);
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, size, 2000), kernel);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, size, DeltaMush::GRAIN_SIZE), kernel);
     }
 	computeDelta(original,(*trgR));
 }

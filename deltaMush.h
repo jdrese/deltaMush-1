@@ -110,6 +110,7 @@ public :
     static MObject		globalScale;
     //Constant value for maximum number of vertexes
     const static uint MAX_NEIGH;
+    const static uint GRAIN_SIZE;
 
 private :
     //Variables holding the points mesh data
